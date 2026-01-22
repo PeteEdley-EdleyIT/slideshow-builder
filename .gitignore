@@ -1,0 +1,19 @@
+# Nix files
+result
+.direnv
+.venv/
+
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Video output
+*.mp4
+
+# Image folder
+images/
