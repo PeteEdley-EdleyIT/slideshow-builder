@@ -10,7 +10,9 @@ import xml.etree.ElementTree as ET
 import tempfile
 import shutil
 
-def get_nextcloud_image_paths(base_url, username, password, remote_path):
+FPS = 24 # Frames per second for the video
+
+def get_nextcloud_image_paths(base_url, username, password, remote_path, verify_ssl=True):
     # Construct the full WebDAV URL for PROPFIND
     # The base_url should be something like "https://cloud.mcfchurch.co.uk/"
     # The remote_path should be something like "Uploads/Notices Slides"
@@ -38,7 +40,7 @@ def get_nextcloud_image_paths(base_url, username, password, remote_path):
             propfind_url,
             auth=(username, password),
             headers=headers,
-            verify=False # Consider setting to True and handling SSL certs in production
+            verify=verify_ssl
         )
         response.raise_for_status() # Raise an exception for HTTP errors
 
@@ -65,7 +67,7 @@ def get_nextcloud_image_paths(base_url, username, password, remote_path):
                 download_response = requests.get(
                     download_url,
                     auth=(username, password),
-                    verify=False, # Consider setting to True
+                    verify=verify_ssl,
                     stream=True
                 )
                 download_response.raise_for_status()
@@ -88,14 +90,15 @@ def get_nextcloud_image_paths(base_url, username, password, remote_path):
 
 
 def create_slideshow(image_folder, output_filepath, image_duration=10, target_video_duration=600,
-                     nextcloud_url=None, nextcloud_username=None, nextcloud_password=None, nextcloud_path=None):
+                     nextcloud_url=None, nextcloud_username=None, nextcloud_password=None, nextcloud_path=None,
+                     verify_ssl=True):
     image_paths = []
     temp_nextcloud_dir = None
 
     if nextcloud_url and nextcloud_username and nextcloud_password and nextcloud_path:
         print("Retrieving images from Nextcloud...")
         image_paths, temp_nextcloud_dir = get_nextcloud_image_paths(
-            nextcloud_url, nextcloud_username, nextcloud_password, nextcloud_path
+            nextcloud_url, nextcloud_username, nextcloud_password, nextcloud_path, verify_ssl
         )
         if not image_paths:
             print("No images found in Nextcloud or an error occurred. Exiting.")
@@ -119,7 +122,7 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
 
     # Create ImageClips for each image
     clips = []
-    fps = 24 # Define fps for the writer and clip attribute
+    # fps = 24 # Define fps for the writer and clip attribute - REMOVED
     for image_path in image_paths:
         try:
             # Create a clip and set the duration
@@ -147,7 +150,7 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
         repeated_clips.extend(clips)
 
     final_clip = concatenate_videoclips(repeated_clips)
-    final_clip.fps = fps # Set fps for the final clip
+    final_clip.fps = FPS # Set fps for the final clip
 
     # Trim the final clip to the exact target_video_duration
     final_clip = final_clip.subclip(0, target_video_duration)
@@ -161,8 +164,8 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    fps = 24 # Define fps for the writer
-    with FFMPEG_VideoWriter(output_filepath, final_clip.size, fps, codec="libx264") as writer:
+    # fps = 24 # Define fps for the writer - REMOVED
+    with FFMPEG_VideoWriter(output_filepath, final_clip.size, FPS, codec="libx264") as writer:
         for frame in final_clip.iter_frames():
             writer.write_frame(frame)
 
@@ -186,6 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("--nextcloud-username", help="Nextcloud username.")
     parser.add_argument("--nextcloud-password", help="Nextcloud app password or regular password.")
     parser.add_argument("--nextcloud-path", default="", help="Path within Nextcloud to the folder containing images (e.g., 'Photos/Slideshows').")
+    parser.add_argument("--nextcloud-insecure-ssl", action="store_true", help="Disable SSL certificate verification for Nextcloud connections. Use with caution.")
 
     args = parser.parse_args()
 
@@ -196,10 +200,11 @@ if __name__ == "__main__":
             output_filepath=args.output_filepath,
             image_duration=args.duration,
             target_video_duration=args.target_video_duration,
-            nextcloud_url=args.nextcloud_url,
+            nextcloud_url=args.nextcloud_url, # This will now be the base_url
             nextcloud_username=args.nextcloud_username,
             nextcloud_password=args.nextcloud_password,
-            nextcloud_path=args.nextcloud_path
+            nextcloud_path=args.nextcloud_path,
+            verify_ssl=not args.nextcloud_insecure_ssl # Pass True by default, False if --nextcloud-insecure-ssl is used
         )
     else:
         create_slideshow(
