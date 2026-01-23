@@ -4,7 +4,9 @@ import glob
 from moviepy.editor import ImageClip, concatenate_videoclips
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 
-def create_slideshow(image_folder, output_filepath, image_duration=10):
+import math
+
+def create_slideshow(image_folder, output_filepath, image_duration=10, target_video_duration=600):
     # Ensure the image folder exists
     if not os.path.isdir(image_folder):
         print(f"Error: Image folder '{image_folder}' not found.")
@@ -38,8 +40,24 @@ def create_slideshow(image_folder, output_filepath, image_duration=10):
         return
 
     # Concatenate all image clips.
-    final_clip = concatenate_videoclips(clips)
+    # Calculate the total duration of one sequence of images
+    sequence_duration = len(clips) * image_duration
+
+    # Calculate how many times to repeat the sequence to reach target_video_duration
+    # We use math.ceil to ensure we have enough repetitions
+    num_repeats = math.ceil(target_video_duration / sequence_duration) if sequence_duration > 0 else 1
+
+    # Repeat the sequence of clips
+    repeated_clips = []
+    for _ in range(int(num_repeats)):
+        repeated_clips.extend(clips)
+
+    final_clip = concatenate_videoclips(repeated_clips)
     final_clip.fps = fps # Set fps for the final clip
+
+    # Trim the final clip to the exact target_video_duration
+    final_clip = final_clip.subclip(0, target_video_duration)
+    final_clip.duration = target_video_duration # Explicitly set duration after subclip
 
     # Write the result to a file
     print(f"Writing video to {output_filepath}...")
@@ -62,7 +80,9 @@ if __name__ == "__main__":
     parser.add_argument("output_filepath", help="Path and filename for the output video (e.g., output.mp4).")
     parser.add_argument("--duration", type=int, default=10,
                         help="Duration each image is displayed in seconds (default: 10).")
+    parser.add_argument("--target_video_duration", type=int, default=600,
+                        help="Target duration of the final video in seconds (default: 600 for 10 minutes).")
 
     args = parser.parse_args()
 
-    create_slideshow(args.image_folder, args.output_filepath, args.duration)
+    create_slideshow(args.image_folder, args.output_filepath, args.duration, args.target_video_duration)

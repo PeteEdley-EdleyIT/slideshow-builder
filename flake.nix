@@ -2,7 +2,7 @@
   description = "A Python development environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
   };
 
   outputs = { self, nixpkgs }:
@@ -23,7 +23,6 @@
           # System-level dependencies
           pkgs.git
           pkgs.ffmpeg
-          pkgs.gemini-cli
 
           # Python packages managed by Nix
           pkgs.python311Packages.numpy
