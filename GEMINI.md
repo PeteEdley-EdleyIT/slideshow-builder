@@ -9,6 +9,7 @@ The development enviroment will be a nixos machine and we will developing in pyt
 
 # Deployment
 Final deployment will be via a docker image, the script will run via a cron drop within the docker image.
+Configuration will be managed via environment variables, which can be set in a `.env` file for local development.
 
 # Features
 ## Complete
@@ -19,6 +20,6 @@ Final deployment will be via a docker image, the script will run via a cron drop
 
 - [x] Get the slide show to repeat multiple times making the video 10 min long
 - [x] Retrieve image files from nextcloud folder as an option along side local files
-- [ ] Save the video file to a nextcloud folder
+- [x] Save the video file to a nextcloud folder
 - [ ] Order image files numerically, placing non-prefixed files at the end of the sequence.
 
