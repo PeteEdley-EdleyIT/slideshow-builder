@@ -17,3 +17,6 @@ venv/
 
 # Image folder
 images/
+
+# Environment variables
+.env
