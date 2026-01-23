@@ -3,6 +3,9 @@ import os
 import glob
 from moviepy.editor import ImageClip, concatenate_videoclips
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
+from dotenv import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 
 import math
 import requests
@@ -11,6 +14,12 @@ import tempfile
 import shutil
 
 FPS = 24 # Frames per second for the video
+
+def get_env_var(name, default=None, required=False):
+    value = os.getenv(name, default)
+    if required and value is None:
+        raise ValueError(f"Environment variable '{name}' is required but not set.")
+    return value
 
 def get_nextcloud_image_paths(base_url, username, password, remote_path, verify_ssl=True):
     # Construct the full WebDAV URL for PROPFIND
@@ -91,7 +100,9 @@ def get_nextcloud_image_paths(base_url, username, password, remote_path, verify_
 
 def create_slideshow(image_folder, output_filepath, image_duration=10, target_video_duration=600,
                      nextcloud_url=None, nextcloud_username=None, nextcloud_password=None, nextcloud_path=None,
-                     verify_ssl=True):
+                     verify_ssl=True,
+                     upload_nextcloud_url=None, upload_nextcloud_username=None, upload_nextcloud_password=None,
+                     upload_nextcloud_path=None):
     image_paths = []
     temp_nextcloud_dir = None
 
@@ -103,7 +114,7 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
         if not image_paths:
             print("No images found in Nextcloud or an error occurred. Exiting.")
             return
-    else:
+    elif image_folder: # Use local image folder if Nextcloud not specified
         # Ensure the image folder exists
         if not os.path.isdir(image_folder):
             print(f"Error: Image folder '{image_folder}' not found.")
@@ -117,12 +128,14 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
         if not image_paths:
             print(f"No JPEG images found in '{image_folder}'.")
             return
+    else:
+        print("Error: No image source (local folder or Nextcloud) specified. Exiting.")
+        return
 
     print(f"Found {len(image_paths)} images. Creating slideshow...")
 
     # Create ImageClips for each image
     clips = []
-    # fps = 24 # Define fps for the writer and clip attribute - REMOVED
     for image_path in image_paths:
         try:
             # Create a clip and set the duration
@@ -164,7 +177,6 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # fps = 24 # Define fps for the writer - REMOVED
     with FFMPEG_VideoWriter(output_filepath, final_clip.size, FPS, codec="libx264") as writer:
         for frame in final_clip.iter_frames():
             writer.write_frame(frame)
@@ -176,6 +188,30 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
         print(f"Cleaning up temporary Nextcloud directory: {temp_nextcloud_dir}")
         shutil.rmtree(temp_nextcloud_dir)
 
+    # Upload video to Nextcloud if configured
+    if upload_nextcloud_url and upload_nextcloud_username and upload_nextcloud_password and upload_nextcloud_path:
+        print(f"Uploading video to Nextcloud: {upload_nextcloud_path}...")
+        try:
+            # Ensure base_url ends with a slash
+            if not upload_nextcloud_url.endswith('/'):
+                upload_nextcloud_url += '/'
+            
+            # Construct the full upload URL
+            # Nextcloud WebDAV URL structure: base_url/remote.php/dav/files/username/path/to/file.mp4
+            full_upload_url = f"{upload_nextcloud_url}remote.php/dav/files/{upload_nextcloud_username}/{upload_nextcloud_path}"
+            
+            with open(output_filepath, 'rb') as video_file:
+                response = requests.put(
+                    full_upload_url,
+                    data=video_file,
+                    auth=(upload_nextcloud_username, upload_nextcloud_password),
+                    verify=verify_ssl
+                )
+                response.raise_for_status()
+            print(f"Video uploaded successfully to Nextcloud: {full_upload_url}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error uploading video to Nextcloud: {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create a slideshow video from a folder of JPEG images.")
@@ -185,31 +221,47 @@ if __name__ == "__main__":
                         help="Duration each image is displayed in seconds (default: 10).")
     parser.add_argument("--target_video_duration", type=int, default=600,
                         help="Target duration of the final video in seconds (default: 600 for 10 minutes).")
-    parser.add_argument("--nextcloud-url", help="Base URL of the Nextcloud instance (e.g., https://your.nextcloud.com/).")
-    parser.add_argument("--nextcloud-username", help="Nextcloud username.")
-    parser.add_argument("--nextcloud-password", help="Nextcloud app password or regular password.")
-    parser.add_argument("--nextcloud-path", default="", help="Path within Nextcloud to the folder containing images (e.g., 'Photos/Slideshows').")
-    parser.add_argument("--nextcloud-insecure-ssl", action="store_true", help="Disable SSL certificate verification for Nextcloud connections. Use with caution.")
 
     args = parser.parse_args()
 
+    # Retrieve Nextcloud configuration from environment variables
+    nextcloud_url = get_env_var("NEXTCLOUD_URL")
+    nextcloud_username = get_env_var("NEXTCLOUD_USERNAME")
+    nextcloud_password = get_env_var("NEXTCLOUD_PASSWORD")
+    nextcloud_path = get_env_var("NEXTCLOUD_PATH", default="")
+    nextcloud_insecure_ssl = get_env_var("NEXTCLOUD_INSECURE_SSL", default="False").lower() == "true"
+
+    # Retrieve Nextcloud upload configuration from environment variables
+    upload_nextcloud_url = get_env_var("UPLOAD_NEXTCLOUD_URL")
+    upload_nextcloud_username = get_env_var("UPLOAD_NEXTCLOUD_USERNAME")
+    upload_nextcloud_password = get_env_var("UPLOAD_NEXTCLOUD_PASSWORD")
+    upload_nextcloud_path = get_env_var("UPLOAD_NEXTCLOUD_PATH")
+
     # Determine image source
-    if args.nextcloud_url and args.nextcloud_username and args.nextcloud_password:
+    if nextcloud_url and nextcloud_username and nextcloud_password:
         create_slideshow(
             image_folder=None, # Not used when Nextcloud is active
             output_filepath=args.output_filepath,
             image_duration=args.duration,
             target_video_duration=args.target_video_duration,
-            nextcloud_url=args.nextcloud_url, # This will now be the base_url
-            nextcloud_username=args.nextcloud_username,
-            nextcloud_password=args.nextcloud_password,
-            nextcloud_path=args.nextcloud_path,
-            verify_ssl=not args.nextcloud_insecure_ssl # Pass True by default, False if --nextcloud-insecure-ssl is used
+            nextcloud_url=nextcloud_url,
+            nextcloud_username=nextcloud_username,
+            nextcloud_password=nextcloud_password,
+            nextcloud_path=nextcloud_path,
+            verify_ssl=not nextcloud_insecure_ssl,
+            upload_nextcloud_url=upload_nextcloud_url,
+            upload_nextcloud_username=upload_nextcloud_username,
+            upload_nextcloud_password=upload_nextcloud_password,
+            upload_nextcloud_path=upload_nextcloud_path
         )
     else:
         create_slideshow(
             image_folder=args.image_folder,
             output_filepath=args.output_filepath,
             image_duration=args.duration,
-            target_video_duration=args.target_video_duration
+            target_video_duration=args.target_video_duration,
+            upload_nextcloud_url=upload_nextcloud_url,
+            upload_nextcloud_username=upload_nextcloud_username,
+            upload_nextcloud_password=upload_nextcloud_password,
+            upload_nextcloud_path=upload_nextcloud_path
         )
