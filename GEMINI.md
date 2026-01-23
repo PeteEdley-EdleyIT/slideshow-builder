@@ -18,7 +18,7 @@ Final deployment will be via a docker image, the script will run via a cron drop
 ==these are to be carried out one at a time in the order listed and a commit made to git once complted and fully tested==
 
 - [x] Get the slide show to repeat multiple times making the video 10 min long
-- [ ] Retrieve image files from nextcloud folder as an option along side local files
+- [x] Retrieve image files from nextcloud folder as an option along side local files
 - [ ] Save the video file to a nextcloud folder
 - [ ] Order image files numerically, placing non-prefixed files at the end of the sequence.
 
