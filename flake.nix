@@ -28,6 +28,7 @@
           pkgs.python311Packages.numpy
           pkgs.python311Packages.moviepy
           pkgs.python311Packages.pillow
+          pkgs.python311Packages.requests
         ];
 
         # This hook will create and activate a virtual environment named '.venv'
