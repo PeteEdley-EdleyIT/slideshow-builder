@@ -214,13 +214,28 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
 
 
 if __name__ == "__main__":
+    # Retrieve default values from environment variables, if set
+    env_image_duration_str = get_env_var("IMAGE_DURATION", default="10")
+    env_target_video_duration_str = get_env_var("TARGET_VIDEO_DURATION", default="600")
+
+    # Convert to int for argparse default, ensuring fallback if env var is invalid
+    try:
+        env_image_duration = int(env_image_duration_str)
+    except ValueError:
+        env_image_duration = 10 # Fallback to hardcoded default
+    
+    try:
+        env_target_video_duration = int(env_target_video_duration_str)
+    except ValueError:
+        env_target_video_duration = 600 # Fallback to hardcoded default
+
     parser = argparse.ArgumentParser(description="Create a slideshow video from a folder of JPEG images.")
     parser.add_argument("--image_folder", default="images/", help="Path to the folder containing JPEG images (default: images/).")
     parser.add_argument("output_filepath", help="Path and filename for the output video (e.g., output.mp4).")
-    parser.add_argument("--duration", type=int, default=10,
-                        help="Duration each image is displayed in seconds (default: 10).")
-    parser.add_argument("--target_video_duration", type=int, default=600,
-                        help="Target duration of the final video in seconds (default: 600 for 10 minutes).")
+    parser.add_argument("--duration", type=int, default=env_image_duration,
+                        help=f"Duration each image is displayed in seconds (default: {env_image_duration} from env or 10).")
+    parser.add_argument("--target_video_duration", type=int, default=env_target_video_duration,
+                        help=f"Target duration of the final video in seconds (default: {env_target_video_duration} from env or 600 for 10 minutes).")
 
     args = parser.parse_args()
 
