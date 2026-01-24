@@ -32,6 +32,50 @@ python create_slideshow.py output/test_slideshow.mp4
 ```
 For cron integration, we will need to set up the cron daemon within the Docker image. This is the next step.
 
+## Pushing to Docker Hub (or other registry)
+1.  **Build the image:**
+    ```bash
+    nix build .#packages.dockerImage
+    ```
+2.  **Load into your local Docker daemon:**
+    ```bash
+    docker load < $(nix path-info .#packages.dockerImage)
+    ```
+3.  **Tag the image for Docker Hub:** Replace `your_dockerhub_username` with your actual Docker Hub username.
+    ```bash
+    docker tag notices-video-automation:latest your_dockerhub_username/notices-video-automation:latest
+    ```
+4.  **Log in to Docker Hub:**
+    ```bash
+    docker login
+    ```
+5.  **Push the image:**
+    ```bash
+    docker push your_dockerhub_username/notices-video-automation:latest
+    ```
+
+## Moving to a Server (without a registry)
+1.  **Build the image:**
+    ```bash
+    nix build .#packages.dockerImage
+    ```
+2.  **Load into your local Docker daemon:**
+    ```bash
+    docker load < $(nix path-info .#packages.dockerImage)
+    ```
+3.  **Save the image as a tar archive:**
+    ```bash
+    docker save -o notices-video-automation.tar notices-video-automation:latest
+    ```
+4.  **Transfer the `.tar` file to your server:** (e.g., using `scp`)
+    ```bash
+    scp notices-video-automation.tar user@your-server-ip:/path/on/server/
+    ```
+5.  **Load the image on the target server:**
+    ```bash
+    docker load -i /path/on/server/notices-video-automation.tar
+    ```
+
 # Features
 ## Complete
 - [x] Initial minimun viable code - This needs to take images stored in a local folder and combine them into a video with each image being displayed for 10 seconds. The video needs to then be written out to another local folder
