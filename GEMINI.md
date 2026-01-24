@@ -89,5 +89,5 @@ For cron integration, we will need to set up the cron daemon within the Docker i
 
 ## TODO
 ==these are to be carried out one at a time in the order listed and a commit made to git once complted and fully tested==
-- [ ] Integrate cron job into Docker image.
+- [x] Integrate cron job into Docker image.
 
