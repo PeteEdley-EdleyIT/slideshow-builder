@@ -6,6 +6,7 @@ import shutil
 from moviepy.editor import ImageClip, concatenate_videoclips
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 from dotenv import load_dotenv
+import tempfile # Added import for tempfile
 
 from nextcloud_client import NextcloudClient, sort_key
 
@@ -100,7 +101,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Create a slideshow video from a folder of JPEG images.")
     parser.add_argument("--image_folder", default="images/", help="Path to the folder containing JPEG images.")
-    parser.add_argument("output_filepath", help="Path and filename for the output video.")
+    parser.add_argument("output_filepath", nargs='?', help="Path and filename for the output video (optional if UPLOAD_NEXTCLOUD_PATH env var is set).")
     parser.add_argument("--duration", type=int, default=env_image_duration, help=f"Duration each image is displayed in seconds (default: {env_image_duration}).")
     parser.add_argument("--target_video_duration", type=int, default=env_target_video_duration, help=f"Target duration of the final video in seconds (default: {env_target_video_duration}).")
 
@@ -119,12 +120,33 @@ if __name__ == "__main__":
         client = NextcloudClient(nc_url, nc_user, nc_pass, verify_ssl=not nc_insecure)
         image_source_folder = None  # Disable local folder when using Nextcloud
 
-    create_slideshow(
-        output_filepath=args.output_filepath,
-        image_duration=args.duration,
-        target_video_duration=args.target_video_duration,
-        image_folder=image_source_folder,
-        nextcloud_client=client,
-        nextcloud_image_path=nc_image_path,
-        nextcloud_upload_path=nc_upload_path
-    )
+    final_output_filepath = args.output_filepath
+    temp_output_file_created = False
+
+    if not final_output_filepath: # If output_filepath not provided via CLI
+        if nc_upload_path: # If upload path is set, create a temporary file
+            # Create a temporary file path for the video
+            # We use tempfile.mkstemp to get a file descriptor and path, then close the fd
+            fd, path = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd) # Close the file descriptor immediately
+            final_output_filepath = path
+            temp_output_file_created = True
+            print(f"No output filepath provided, creating temporary file: {final_output_filepath}")
+        else:
+            parser.error("Output filepath is required. Provide it via command line or ensure UPLOAD_NEXTCLOUD_PATH environment variable is set for direct upload.")
+
+    try:
+        create_slideshow(
+            output_filepath=final_output_filepath,
+            image_duration=args.duration,
+            target_video_duration=args.target_video_duration,
+            image_folder=image_source_folder,
+            nextcloud_client=client,
+            nextcloud_image_path=nc_image_path,
+            nextcloud_upload_path=nc_upload_path
+        )
+    finally:
+        # Clean up the temporary output file if it was created
+        if temp_output_file_created and os.path.exists(final_output_filepath):
+            print(f"Cleaning up temporary output file: {final_output_filepath}")
+            os.remove(final_output_filepath)
