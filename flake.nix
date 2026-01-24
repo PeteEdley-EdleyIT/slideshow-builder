@@ -44,42 +44,19 @@
             pythonEnv
             pkgs.bash
             pkgs.ffmpeg
-            pkgs.cronie # Add cronie for cron daemon
+            pkgs.cron # Add cronie for cron daemon
             appSrc
           ];
 
           config = {
-            Cmd = [ "/usr/local/bin/start-cron.sh" ]; # New command to start cron
+            Cmd = [ "/app/setup-docker.sh" ]; # Execute the setup script
             Entrypoint = [ "${pkgs.bash}/bin/bash" "-c" ];
             WorkingDir = "/app";
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ pythonEnv pkgs.bash pkgs.ffmpeg pkgs.cronie ]}" # Add cronie to PATH
+              "PATH=${pkgs.lib.makeBinPath [ pythonEnv pkgs.bash pkgs.ffmpeg pkgs.cron ]}" # Add cronie to PATH
               "PYTHONUNBUFFERED=1"
             ];
           };
-
-          postInstall = ''
-            mkdir -p $out/app
-            cp -r ${appSrc}/* $out/app/
-            chmod +x $out/app/create_slideshow.py # Make script executable
-
-            # Create cron job file for root user
-            mkdir -p $out/etc/crontabs
-            echo "*/5 * * * * /app/create_slideshow.py >> /var/log/slideshow_cron.log 2>&1" > $out/etc/crontabs/root
-            chmod 0600 $out/etc/crontabs/root
-
-            # Create entrypoint script to start cronie in foreground
-            mkdir -p $out/usr/local/bin
-            cat > $out/usr/local/bin/start-cron.sh <<EOF
-            #!/bin/bash
-            echo "Starting cron daemon..."
-            # Ensure cronie uses the crontab we created
-            crontab -u root $out/etc/crontabs/root
-            # Start cronie in foreground, logging to stderr
-            exec ${pkgs.cronie}/bin/crond -f -L /dev/stderr
-            EOF
-            chmod +x $out/usr/local/bin/start-cron.sh
-          '';
         };
       }
     );
