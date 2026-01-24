@@ -21,5 +21,5 @@ Configuration will be managed via environment variables, which can be set in a `
 - [x] Get the slide show to repeat multiple times making the video 10 min long
 - [x] Retrieve image files from nextcloud folder as an option along side local files
 - [x] Save the video file to a nextcloud folder
-- [ ] Order image files numerically, placing non-prefixed files at the end of the sequence.
+- [x] Order image files numerically, placing non-prefixed files at the end of the sequence.
 

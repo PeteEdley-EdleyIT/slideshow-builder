@@ -1,6 +1,7 @@
 import argparse
 import os
 import glob
+import re
 from moviepy.editor import ImageClip, concatenate_videoclips
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 from dotenv import load_dotenv
@@ -14,6 +15,17 @@ import tempfile
 import shutil
 
 FPS = 24 # Frames per second for the video
+
+def sort_key(filepath):
+    filename = os.path.basename(filepath)
+    match = re.match(r'(\d+)', filename)
+    if match:
+        # Return a tuple for sorting: (0, number, filename)
+        # 0 for numeric prefix, making it come first
+        return (0, int(match.group(1)), filename)
+    else:
+        # 1 for non-numeric, making it come after
+        return (1, filename, filename)
 
 def get_env_var(name, default=None, required=False):
     value = os.getenv(name, default)
@@ -95,7 +107,8 @@ def get_nextcloud_image_paths(base_url, username, password, remote_path, verify_
         shutil.rmtree(temp_dir)
         return None, None
     
-    return sorted(downloaded_image_paths), temp_dir
+    downloaded_image_paths.sort(key=sort_key)
+    return downloaded_image_paths, temp_dir
 
 
 def create_slideshow(image_folder, output_filepath, image_duration=10, target_video_duration=600,
@@ -122,8 +135,9 @@ def create_slideshow(image_folder, output_filepath, image_duration=10, target_vi
 
         # Find all JPEG images in the specified folder
         # Sort them to ensure a consistent order
-        image_paths = sorted(glob.glob(os.path.join(image_folder, "*.jpg")))
-        image_paths.extend(sorted(glob.glob(os.path.join(image_folder, "*.jpeg"))))
+        image_paths = glob.glob(os.path.join(image_folder, "*.jpg"))
+        image_paths.extend(glob.glob(os.path.join(image_folder, "*.jpeg")))
+        image_paths.sort(key=sort_key)
 
         if not image_paths:
             print(f"No JPEG images found in '{image_folder}'.")
