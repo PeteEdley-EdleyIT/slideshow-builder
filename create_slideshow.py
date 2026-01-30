@@ -18,6 +18,8 @@ FPS = 5  # Frames per second for the video
 
 def get_env_var(name, default=None, required=False):
     value = os.getenv(name, default)
+    if value is not None:
+        value = value.strip('"').strip("'")
     if required and value is None:
         raise ValueError(f"Environment variable '{name}' is required but not set.")
     return value

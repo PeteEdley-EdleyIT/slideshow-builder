@@ -6,20 +6,62 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        pythonEnv = pkgs.python311.withPackages (p: with p; [
-          numpy
-          moviepy
-          pillow
-          requests
-          python-dotenv
-        ]);
+        pythonEnv = pkgs.python311.withPackages (
+          p: with p; [
+            numpy
+            moviepy
+            pillow
+            requests
+            python-dotenv
+            setuptools
+          ]
+        );
 
         appSrc = pkgs.lib.cleanSource ./.; # Get all files in the current directory
+
+        appDir = pkgs.stdenv.mkDerivation {
+          name = "notices-video-automation-app";
+          src = appSrc;
+          installPhase = ''
+            mkdir -p $out/app
+            cp -r * $out/app/
+            chmod +x $out/app/setup-docker.sh $out/app/create_slideshow.py
+          '';
+        };
+
+        rootContents = pkgs.buildEnv {
+          name = "root-contents";
+          paths = [
+            pkgs.bash
+            pkgs.ffmpeg
+            pkgs.cron
+            pkgs.coreutils
+            pkgs.gnugrep
+            pkgs.gnused
+            appDir
+          ];
+          postBuild = ''
+            mkdir -p $out/tmp
+            mkdir -p $out/var/run
+            mkdir -p $out/var/log
+            mkdir -p $out/etc/crontabs
+            # Add a basic /etc/passwd for root if needed, though cron usually wants it
+            mkdir -p $out/etc
+            echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
+            echo "root:x:0:" > $out/etc/group
+          '';
+        };
 
       in
       {
@@ -39,21 +81,27 @@
           name = "notices-video-automation";
           tag = "latest";
 
-          # The contents of the Docker image
-          contents = [
-            pythonEnv
-            pkgs.bash
-            pkgs.ffmpeg
-            pkgs.cron # Add cronie for cron daemon
-            appSrc
-          ];
+          copyToRoot = [ rootContents ];
 
           config = {
             Cmd = [ "/app/setup-docker.sh" ]; # Execute the setup script
-            Entrypoint = [ "${pkgs.bash}/bin/bash" "-c" ];
+            Entrypoint = [
+              "${pkgs.bash}/bin/bash"
+              "-c"
+            ];
             WorkingDir = "/app";
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ pythonEnv pkgs.bash pkgs.ffmpeg pkgs.cron ]}" # Add cronie to PATH
+              "PATH=${
+                pkgs.lib.makeBinPath [
+                  pythonEnv
+                  pkgs.bash
+                  pkgs.ffmpeg
+                  pkgs.cron
+                  pkgs.coreutils
+                  pkgs.gnugrep
+                  pkgs.gnused
+                ]
+              }"
               "PYTHONUNBUFFERED=1"
             ];
           };
