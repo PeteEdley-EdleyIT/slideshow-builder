@@ -28,7 +28,7 @@ This command builds the image and creates a `result` symlink to the `.tar.gz` ar
       --name notices-automation \
       --restart always \
       --env-file .env \
-      localhost/notices-video-automation:latest
+      localhost/mcf-notices-builder:latest
     ```
 
 ## Management Commands
@@ -54,11 +54,11 @@ Use these commands to monitor and manage the running automation:
 ## Pushing to a Registry
 1.  **Tag the image:**
     ```bash
-    podman tag localhost/notices-video-automation:latest your-registry/notices-video-automation:latest
+    podman tag localhost/mcf-notices-builder:latest docker.io/pedley/mcf-notices-builder:latest
     ```
 2.  **Push the image:**
     ```bash
-    podman push your-registry/notices-video-automation:latest
+    podman push docker.io/pedley/mcf-notices-builder:latest
     ```
 
 # Features
