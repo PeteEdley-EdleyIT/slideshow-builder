@@ -78,7 +78,7 @@
 
         # Define a Docker image output
         packages.dockerImage = pkgs.dockerTools.buildImage {
-          name = "notices-video-automation";
+          name = "mcf-notices-builder";
           tag = "latest";
 
           copyToRoot = [ rootContents ];
