@@ -91,7 +91,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                 # Use video FPS if available, capped at 24-30 range or similar if needed
                 # For now, let's just use the video's FPS to be safe.
                 if append_video_clip.fps:
-                    fps = max(5, min(30, append_video_clip.fps))
+                    fps = round(max(5, min(30, append_video_clip.fps)), 2)
                 print(f"Loaded append video: {local_video_path} (Duration: {append_video_clip.duration}s, FPS: {fps})")
             except Exception as e:
                 print(f"Error loading append video '{local_video_path}': {e}")
@@ -119,8 +119,10 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     
     # Add silent audio track to slideshow to match appended video
     # This avoids NoneType errors during concatenation of audio tracks
-    silent_audio = AudioClip(lambda t: [0, 0], duration=slideshow_target_duration, fps=44100)
+    silent_audio = AudioClip(lambda t: np.zeros(2), duration=slideshow_target_duration, fps=44100)
     slideshow_video = slideshow_video.set_audio(silent_audio)
+    slideshow_video.duration = slideshow_target_duration
+    slideshow_video.fps = fps
 
     if append_video_clip:
         # Match dimensions if necessary (simple concatenation might require same size)
@@ -150,7 +152,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             temp_audiofile="temp-audio.m4a",
             remove_temp=True,
             verbose=False,
-            progress_bar=False
+            logger=None
         )
     except Exception as e:
         print(f"An error occurred during video writing: {e}")
