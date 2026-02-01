@@ -13,7 +13,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     # In Pillow 10+, ANTIALIAS was removed in favor of LANCZOS
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
-from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip, AudioFileClip, concatenate_audioclips
+from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip, AudioFileClip, concatenate_audioclips, CompositeAudioClip
 from moviepy.video.io.ffmpeg_writer import ffmpeg_write_video
 from dotenv import load_dotenv
 import numpy as np
@@ -206,23 +206,32 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                         audio_end = max(0, slideshow_target_duration - 5)
                         
                         # Clip to the end of audio (leaving 5s silence)
+                        print(f"DEBUG: Trimming music to {audio_end}s (Slideshow duration: {slideshow_target_duration}s)")
                         bg_music = full_music.subclip(0, audio_end)
                         
                         # Apply fadeout at the end of the clip
                         # Note: audio_fadeout applies to the end of the clip
                         bg_music = bg_music.audio_fadeout(fade_duration)
+                        bg_music = bg_music.set_duration(audio_end)
                         
-                        # To enable the 5s silence, we need the audio to be the full slideshow duration
-                        # We can create a CompositeAudioClip or just set the duration of the video
-                        # and MoviePy should handle silence if the audio is shorter.
-                        # However, explicitly adding silence avoids issues.
+                        # Create a silent audio track for the full slideshow duration
+                        # This ensures the audio track matches the video duration exactly, preventing overlap issues
+                        def make_silent_frame(t):
+                            if np.ndim(t) > 0:
+                                return np.zeros((len(t), 2))
+                            else:
+                                return np.zeros(2)
                         
-                        # Better approach: Create a silent track for full duration, overlay music
-                        # Or just set this audio to the video, and since it's shorter, the rest is silence?
-                        # MoviePy 1.0.3 behavior: set_audio with shorter audio loops? No, usually it just stops.
+                        full_silent_audio = AudioClip(make_silent_frame, duration=slideshow_target_duration, fps=44100)
                         
-                        slideshow_audio = bg_music
-                        print("Background music configured with fadeout.")
+                        # Composite the music over the silent track
+                        # bg_music is already trimmed to audio_end (duration-5s)
+                        # We set the start of bg_music to 0 (default)
+                        slideshow_audio = CompositeAudioClip([full_silent_audio, bg_music])
+                        slideshow_audio.duration = slideshow_target_duration
+                        slideshow_audio.fps = 44100
+                        
+                        print(f"Background music configured with fadeout. Duration: {slideshow_audio.duration}s")
                     else:
                         print("Failed to load any valid music tracks.")
                 except Exception as e:
@@ -230,7 +239,9 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                     slideshow_audio = None
 
             if slideshow_audio:
+                # Explicitly set the audio on the slideshow video
                 slideshow_video = slideshow_video.set_audio(slideshow_audio)
+                print(f"DEBUG: Slideshow video audio set. Audio duration: {slideshow_video.audio.duration}s. Video duration: {slideshow_video.duration}s")
             else:
                 # Fallback to silent audio to keep manual writer happy
                 def make_silent_frame(t):
@@ -341,13 +352,6 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
 
     print(f"Slideshow video created successfully at {output_filepath}")
 
-    if temp_nextcloud_dir:
-        print(f"Cleaning up temporary Nextcloud images directory: {temp_nextcloud_dir}")
-        shutil.rmtree(temp_nextcloud_dir)
-    
-    if temp_video_dir:
-        print(f"Cleaning up temporary Nextcloud video directory: {temp_video_dir}")
-        shutil.rmtree(temp_video_dir)
 
     if nextcloud_client and nextcloud_upload_path:
         nextcloud_client.upload_file(output_filepath, nextcloud_upload_path)
