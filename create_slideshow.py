@@ -3,15 +3,18 @@ import glob
 import math
 import shutil
 import tempfile
+from PIL import Image
+
+# Workaround for MoviePy + Pillow 10+ compatibility
+# This MUST happen before moviepy imports to avoid AttributeError in some modules
+if not hasattr(Image, 'ANTIALIAS'):
+    # In Pillow 10+, ANTIALIAS was removed in favor of LANCZOS
+    Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
+
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip
 from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 from dotenv import load_dotenv
-from PIL import Image
 import numpy as np
-
-# Workaround for MoviePy + Pillow 10+ compatibility
-if not hasattr(Image, 'ANTIALIAS'):
-    Image.ANTIALIAS = Image.LANCZOS
 
 from nextcloud_client import NextcloudClient, sort_key
 

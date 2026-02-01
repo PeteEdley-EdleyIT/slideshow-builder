@@ -85,5 +85,5 @@ podman rm notices-automation
 - [x] Make output_filepath optional based on Nextcloud upload.
 - [x] Integrate cron job into Docker image.
 - [x] Make cron schedule configurable via environment variable.
-- [ ] Optionally append a video file (local or Nextcloud) to the end of the slideshow, adjusting slide duration to maintain target video length.
+- [x] Optionally append a video file (local or Nextcloud) to the end of the slideshow, adjusting slide duration to maintain target video length.
 
