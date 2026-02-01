@@ -2,8 +2,9 @@
 
 # Export environment variables for cron
 # Cron runs in a clean environment, so we need to bridge the container's env vars.
-# Export environment variables for cron, ensuring values are quoted to handle spaces
-printenv | grep -v "no_proxy" | sed 's/^\([^=]*\)=\(.*\)/export \1="\2"/' > /app/.env.cron
+# Export environment variables for cron, ensuring values are quoted to handle spaces correctly.
+# We use single quotes for the export to avoid issues if values already contain double quotes.
+printenv | grep -v "no_proxy" | sed "s/^\([^=]*\)=\(.*\)/export \1='\2'/" > /app/.env.cron
 
 # Create the crontab file
 # We'll run it every 5 minutes by default
