@@ -209,6 +209,8 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                         # Clip to the end of audio (leaving 5s silence)
                         print(f"DEBUG: Trimming music to {audio_end}s (Slideshow duration: {slideshow_target_duration}s)")
                         bg_music = full_music.subclip(0, audio_end)
+                        # Force duration update BEFORE fadeout, as subclip might not set it reliably on ConcatenatedAudioClip
+                        bg_music = bg_music.set_duration(audio_end)
                         
                         # Apply fadeout at the end of the clip
                         # Note: audio_fadeout applies to the end of the clip
@@ -221,9 +223,6 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                             print("DEBUG: Fadeout applied successfully.")
                         except Exception as e:
                             print(f"WARNING: audio_fadeout failed: {e}")
-                            
-                        bg_music = bg_music.set_duration(audio_end)
-                        bg_music = bg_music.set_duration(audio_end)
                         
                         # Create a silent audio track for the full slideshow duration
                         # This ensures the audio track matches the video duration exactly, preventing overlap issues
