@@ -17,15 +17,17 @@ import numpy as np
 import proglog
 
 # Global silence for MoviePy progress bars to avoid NoneType math errors
-proglog.default_bar_logger = lambda *args, **kwargs: proglog.TqdmProgressBarLogger(print_messages=False, logger=None)
+proglog.default_bar_logger = lambda *args, **kwargs: proglog.ProgressBarLogger()
+
 # Even more aggressive: override the default logger entirely if possible
 try:
-    from proglog import MuhLogger
-    class NullLogger(MuhLogger):
-        def __init__(self, *args, **kwargs): pass
-        def __call__(self, *args, **kwargs): return self
+    from proglog import ProgressBarLogger
+    class NullLogger(ProgressBarLogger):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+        def callback(self, *args, **kwargs): pass
         def update(self, *args, **kwargs): pass
-    proglog.default_bar_logger = NullLogger
+    proglog.default_bar_logger = lambda *args, **kwargs: NullLogger()
 except ImportError:
     pass
 
