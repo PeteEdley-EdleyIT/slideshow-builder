@@ -14,6 +14,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip, AudioFileClip, concatenate_audioclips, CompositeAudioClip
+from moviepy.audio.fx.all import audio_fadeout
 from moviepy.video.io.ffmpeg_writer import ffmpeg_write_video
 from dotenv import load_dotenv
 import numpy as np
@@ -211,7 +212,17 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
                         
                         # Apply fadeout at the end of the clip
                         # Note: audio_fadeout applies to the end of the clip
-                        bg_music = bg_music.audio_fadeout(fade_duration)
+                        # Using explicit function call to ensure it applies
+                        print(f"DEBUG: Applying audio_fadeout({fade_duration}) to bg_music (duration: {bg_music.duration}s)")
+                        try:
+                            # Try method first, if it fails or doesn't work, we'll strive for functional approach which is often more robust in older mpy
+                            # But since we imported it, we can use the function form:
+                            bg_music = audio_fadeout(bg_music, fade_duration)
+                            print("DEBUG: Fadeout applied successfully.")
+                        except Exception as e:
+                            print(f"WARNING: audio_fadeout failed: {e}")
+                            
+                        bg_music = bg_music.set_duration(audio_end)
                         bg_music = bg_music.set_duration(audio_end)
                         
                         # Create a silent audio track for the full slideshow duration
