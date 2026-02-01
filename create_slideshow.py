@@ -11,7 +11,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     # In Pillow 10+, ANTIALIAS was removed in favor of LANCZOS
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
-from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip
+from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip
 from dotenv import load_dotenv
 import numpy as np
 
@@ -116,6 +116,11 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
 
     slideshow_video = concatenate_videoclips(repeated_clips, method="compose")
     slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
+    
+    # Add silent audio track to slideshow to match appended video
+    # This avoids NoneType errors during concatenation of audio tracks
+    silent_audio = AudioClip(lambda t: [0, 0], duration=slideshow_target_duration, fps=44100)
+    slideshow_video = slideshow_video.set_audio(silent_audio)
 
     if append_video_clip:
         # Match dimensions if necessary (simple concatenation might require same size)
@@ -144,7 +149,8 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             audio_codec="aac",
             temp_audiofile="temp-audio.m4a",
             remove_temp=True,
-            logger=None
+            verbose=False,
+            progress_bar=False
         )
     except Exception as e:
         print(f"An error occurred during video writing: {e}")
