@@ -106,6 +106,9 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         print(f"Adjusting slideshow duration to {slideshow_target_duration}s to accommodate appended video.")
 
     clips = [ImageClip(np.array(Image.open(p))).set_duration(image_duration) for p in image_paths]
+    for clip in clips:
+        clip.fps = fps
+    
     if not clips:
         print("No valid image clips could be created. Exiting.")
         return
@@ -119,7 +122,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     
     # Add silent audio track to slideshow to match appended video
     # This avoids NoneType errors during concatenation of audio tracks
-    silent_audio = AudioClip(lambda t: np.zeros(2), duration=slideshow_target_duration, fps=44100)
+    silent_audio = AudioClip(lambda t: np.zeros((len(t) if hasattr(t, '__len__') else 1, 2)), duration=slideshow_target_duration, fps=44100)
     slideshow_video = slideshow_video.set_audio(silent_audio)
     slideshow_video.duration = slideshow_target_duration
     slideshow_video.fps = fps
@@ -130,7 +133,11 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             print(f"Resizing append video from {append_video_clip.size} to {slideshow_video.size}")
             append_video_clip = append_video_clip.resize(slideshow_video.size)
         
+        # Ensure FPS match
+        append_video_clip.fps = fps
+        
         final_video = concatenate_videoclips([slideshow_video, append_video_clip], method="compose")
+        final_video.duration = slideshow_video.duration + append_video_clip.duration
     else:
         final_video = slideshow_video
 
@@ -152,7 +159,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             temp_audiofile="temp-audio.m4a",
             remove_temp=True,
             verbose=False,
-            logger=None
+            logger=None # MoviePy 1.0.3 uses logger='bar' by default, None or False should disable it
         )
     except Exception as e:
         print(f"An error occurred during video writing: {e}")
