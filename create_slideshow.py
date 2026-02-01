@@ -12,7 +12,6 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip
-from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 from dotenv import load_dotenv
 import numpy as np
 
@@ -115,7 +114,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     num_repeats = math.ceil(slideshow_target_duration / sequence_duration) if sequence_duration > 0 else 1
     repeated_clips = clips * int(num_repeats)
 
-    slideshow_video = concatenate_videoclips(repeated_clips)
+    slideshow_video = concatenate_videoclips(repeated_clips, method="compose")
     slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
 
     if append_video_clip:
@@ -124,7 +123,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             print(f"Resizing append video from {append_video_clip.size} to {slideshow_video.size}")
             append_video_clip = append_video_clip.resize(slideshow_video.size)
         
-        final_video = concatenate_videoclips([slideshow_video, append_video_clip])
+        final_video = concatenate_videoclips([slideshow_video, append_video_clip], method="compose")
     else:
         final_video = slideshow_video
 
@@ -136,11 +135,17 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         os.makedirs(output_dir)
 
     try:
-        # Use a slightly higher bitrate for better quality if FPS is higher
-        bitrate = "2000k" if fps > 10 else "500k"
-        with FFMPEG_VideoWriter(output_filepath, final_video.size, fps, codec="libx264", bitrate=bitrate) as writer:
-            for frame in final_video.iter_frames(fps=fps):
-                writer.write_frame(frame)
+        # Use write_videofile which handles audio and codecs correctly
+        # preset='ultrafast' or 'medium' etc can be adjusted if needed
+        final_video.write_videofile(
+            output_filepath,
+            fps=fps,
+            codec="libx264",
+            audio_codec="aac",
+            temp_audiofile="temp-audio.m4a",
+            remove_temp=True,
+            logger=None
+        )
     except Exception as e:
         print(f"An error occurred during video writing: {e}")
         return
