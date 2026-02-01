@@ -86,4 +86,5 @@ podman rm notices-automation
 - [x] Integrate cron job into Docker image.
 - [x] Make cron schedule configurable via environment variable.
 - [x] Optionally append a video file (local or Nextcloud) to the end of the slideshow, adjusting slide duration to maintain target video length.
+- [x] Background Music: Specify folder (local/Nextcloud), random selection, fade out over last 15s (10s fade, 5s silence) of slideshow.
 
