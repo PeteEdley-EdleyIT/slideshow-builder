@@ -3,6 +3,7 @@ import glob
 import math
 import shutil
 import tempfile
+import traceback
 from PIL import Image
 
 # Workaround for MoviePy + Pillow 10+ compatibility
@@ -12,24 +13,21 @@ if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip
+from moviepy.video.io.ffmpeg_writer import ffmpeg_write_video
 from dotenv import load_dotenv
 import numpy as np
 import proglog
 
-# Global silence for MoviePy progress bars to avoid NoneType math errors
-proglog.default_bar_logger = lambda *args, **kwargs: proglog.ProgressBarLogger()
+# Global silence for MoviePy progress bars
+import proglog
+class NullLogger(proglog.ProgressBarLogger):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    def callback(self, *args, **kwargs): pass
+    def update(self, *args, **kwargs): pass
+    def message(self, *args, **kwargs): pass
 
-# Even more aggressive: override the default logger entirely if possible
-try:
-    from proglog import ProgressBarLogger
-    class NullLogger(ProgressBarLogger):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-        def callback(self, *args, **kwargs): pass
-        def update(self, *args, **kwargs): pass
-    proglog.default_bar_logger = lambda *args, **kwargs: NullLogger()
-except ImportError:
-    pass
+proglog.default_bar_logger = lambda *args, **kwargs: NullLogger()
 
 from nextcloud_client import NextcloudClient, sort_key
 
@@ -125,77 +123,119 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     target_size = (1920, 1080)
     print(f"Standardizing {len(image_paths)} images to {target_size}...")
     
-    clips = []
-    for p in image_paths:
-        try:
-            img = Image.open(p).convert("RGB")
-            if img.size != target_size:
-                img = img.resize(target_size, Image.ANTIALIAS)
-            clip = ImageClip(np.array(img)).set_duration(image_duration)
-            clip.fps = fps
-            clips.append(clip)
-        except Exception as e:
-            print(f"Warning: Could not process image {p}: {e}")
+    if slideshow_target_duration > 0:
+        clips = []
+        for p in image_paths:
+            try:
+                img = Image.open(p).convert("RGB")
+                if img.size != target_size:
+                    img = img.resize(target_size, Image.ANTIALIAS)
+                clip = ImageClip(np.array(img)).set_duration(image_duration)
+                clip.fps = fps
+                clips.append(clip)
+            except Exception as e:
+                print(f"Warning: Could not process image {p}: {e}")
 
-    if not clips:
-        print("No valid image clips could be created. Exiting.")
-        return
+        if not clips:
+            print("No valid image clips could be created. Proceeding with append video only.")
+            slideshow_video = None
+        else:
+            sequence_duration = len(clips) * image_duration
+            num_repeats = math.ceil(slideshow_target_duration / sequence_duration) if sequence_duration > 0 else 1
+            repeated_clips = clips * int(num_repeats)
 
-    sequence_duration = len(clips) * image_duration
-    num_repeats = math.ceil(slideshow_target_duration / sequence_duration) if sequence_duration > 0 else 1
-    repeated_clips = clips * int(num_repeats)
-
-    slideshow_video = concatenate_videoclips(repeated_clips, method="compose")
-    slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
-    
-    # Simplified silent audio generator
-    silent_audio = AudioClip(lambda t: np.zeros((len(t) if np.ndim(t) > 0 else 1, 2)), duration=slideshow_target_duration, fps=44100)
-    slideshow_video = slideshow_video.set_audio(silent_audio)
-    slideshow_video.duration = slideshow_target_duration
-    slideshow_video.fps = fps
+            slideshow_video = concatenate_videoclips(repeated_clips, method="chain")
+            slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
+            
+            # Simplified silent audio generator - returning correct shape for MoviePy
+            def make_silent_frame(t):
+                if np.ndim(t) > 0:
+                    return np.zeros((len(t), 2))
+                else:
+                    return np.zeros(2)
+            
+            silent_audio = AudioClip(make_silent_frame, duration=slideshow_target_duration, fps=44100)
+            slideshow_video = slideshow_video.set_audio(silent_audio)
+            slideshow_video.duration = slideshow_target_duration
+            slideshow_video.fps = fps
+    else:
+        print("Slideshow target duration is 0 or less. Skipping slideshow.")
+        slideshow_video = None
 
     if append_video_clip:
         # Match dimensions if necessary (simple concatenation might require same size)
-        if append_video_clip.size != slideshow_video.size:
+        if slideshow_video and append_video_clip.size != slideshow_video.size:
             print(f"Resizing append video from {append_video_clip.size} to {slideshow_video.size}")
             append_video_clip = append_video_clip.resize(slideshow_video.size)
+        elif not slideshow_video and append_video_clip.size != target_size:
+            print(f"Resizing append video from {append_video_clip.size} to {target_size}")
+            append_video_clip = append_video_clip.resize(target_size)
         
         # Ensure FPS match
         append_video_clip.fps = fps
         
-        final_video = concatenate_videoclips([slideshow_video, append_video_clip], method="compose")
-        final_video.duration = slideshow_video.duration + append_video_clip.duration
-    else:
+        if slideshow_video:
+            final_video = concatenate_videoclips([slideshow_video, append_video_clip], method="chain")
+            final_video.duration = slideshow_video.duration + append_video_clip.duration
+        else:
+            final_video = append_video_clip
+    elif slideshow_video:
         final_video = slideshow_video
+    else:
+        print("Error: No video content to write. Exiting.")
+        return
 
+    # Ensure fps is a float and not None
+    if fps is None:
+        fps = 29.97
+    fps = float(fps)
+    
     final_video.fps = fps
     if final_video.audio:
         final_video.audio.duration = final_video.duration
         final_video.audio.fps = 44100
 
-    print(f"Writing video to {output_filepath} (Duration: {final_video.duration}s, FPS: {final_video.fps})...")
+    print(f"Final Video FPS attribute: {final_video.fps} (type: {type(final_video.fps)})")
+    print(f"Writing video to {output_filepath} (Duration: {final_video.duration}s, FPS: {fps})...")
     output_dir = os.path.dirname(output_filepath)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    print(f"Bypassing MoviePy decorators. Writing video manually...")
+    audio_temp = None
     try:
-        # Use write_videofile which handles audio and codecs correctly
-        # preset='ultrafast' or 'medium' etc can be adjusted if needed
-        final_video.write_videofile(
+        if final_video.audio:
+            audio_temp = tempfile.NamedTemporaryFile(suffix=".m4a", delete=False).name
+            print(f"Writing temporary audio to {audio_temp}...")
+            final_video.audio.write_audiofile(
+                audio_temp,
+                fps=44100,
+                codec="aac",
+                logger=None,
+                verbose=False
+            )
+        
+        print(f"Writing final video to {output_filepath} using ffmpeg_write_video...")
+        ffmpeg_write_video(
+            final_video,
             output_filepath,
-            fps=fps,
+            fps,
             codec="libx264",
-            audio_codec="aac",
-            audio_fps=44100,
-            temp_audiofile="temp-audio.m4a",
-            remove_temp=True,
-            verbose=False,
-            logger=None
+            audiofile=audio_temp,
+            logger=None,
+            verbose=False
         )
     except Exception as e:
-        print(f"An error occurred during video writing: {e}")
+        print(f"An error occurred during manual video writing: {e}")
+        traceback.print_exc()
         return
     finally:
+        if audio_temp and os.path.exists(audio_temp):
+            try:
+                os.remove(audio_temp)
+            except:
+                pass
+        
         if append_video_clip:
             append_video_clip.close()
 
