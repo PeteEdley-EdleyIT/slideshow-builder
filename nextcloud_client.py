@@ -4,6 +4,7 @@ import requests
 import xml.etree.ElementTree as ET
 import tempfile
 import shutil
+from urllib.parse import quote
 
 def sort_key(filepath):
     """
@@ -34,7 +35,9 @@ class NextcloudClient:
 
     def _get_webdav_url(self, path):
         """Constructs the full WebDAV URL for a given path."""
-        return f"{self.base_url}remote.php/dav/files/{self.auth[0]}/{path.strip('/')}"
+        user_encoded = quote(self.auth[0])
+        path_encoded = quote(path.strip('/'), safe='/')
+        return f"{self.base_url}remote.php/dav/files/{user_encoded}/{path_encoded}"
 
     def list_and_download_images(self, remote_path):
         """
@@ -85,6 +88,30 @@ class NextcloudClient:
 
         downloaded_image_paths.sort(key=sort_key)
         return downloaded_image_paths, temp_dir
+
+    def download_file(self, remote_path):
+        """
+        Downloads a single file from Nextcloud to a temporary directory.
+        Returns the local path and the temporary directory path.
+        """
+        download_url = self._get_webdav_url(remote_path)
+        temp_dir = tempfile.mkdtemp()
+        local_filename = os.path.join(temp_dir, os.path.basename(remote_path))
+
+        print(f"Downloading {remote_path} from Nextcloud to {local_filename}...")
+        try:
+            download_response = requests.get(download_url, auth=self.auth, verify=self.verify_ssl, stream=True)
+            download_response.raise_for_status()
+
+            with open(local_filename, 'wb') as f:
+                for chunk in download_response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            return local_filename, temp_dir
+        except requests.exceptions.RequestException as e:
+            print(f"Error downloading file from Nextcloud: {e}")
+            shutil.rmtree(temp_dir)
+            return None, None
 
     def upload_file(self, local_filepath, remote_path):
         """Uploads a local file to a specified path on Nextcloud."""

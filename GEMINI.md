@@ -13,7 +13,7 @@ Final deployment is via a container image, built using Nix. The script runs via 
 ## Building the Image
 To build the container image using Nix, run the following command from the project root:
 ```bash
-nix build .#packages.dockerImage
+nix build .#dockerImage
 ```
 This command builds the image and creates a `result` symlink to the `.tar.gz` archive in the Nix store.
 
@@ -50,6 +50,18 @@ Use these commands to monitor and manage the running automation:
   ```bash
   podman restart notices-automation
   ```
+- **Manual Trigger (Run Immediately):**
+  ```bash
+  podman exec notices-automation bash -c ". /app/.env.cron; python3 /app/create_slideshow.py"
+  ```
+
+## Updating the Automation
+When you have built and loaded a new image, you must remove the old container and start a new one to apply changes:
+```bash
+podman stop notices-automation
+podman rm notices-automation
+# Then run the 'podman run' command from the 'Running with Podman' section
+```
 
 ## Pushing to a Registry
 1.  **Tag the image:**
@@ -73,4 +85,5 @@ Use these commands to monitor and manage the running automation:
 - [x] Make output_filepath optional based on Nextcloud upload.
 - [x] Integrate cron job into Docker image.
 - [x] Make cron schedule configurable via environment variable.
+- [ ] Optionally append a video file (local or Nextcloud) to the end of the slideshow, adjusting slide duration to maintain target video length.
 
