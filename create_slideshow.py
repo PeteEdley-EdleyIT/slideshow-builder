@@ -14,6 +14,20 @@ if not hasattr(Image, 'ANTIALIAS'):
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip
 from dotenv import load_dotenv
 import numpy as np
+import proglog
+
+# Global silence for MoviePy progress bars to avoid NoneType math errors
+proglog.default_bar_logger = lambda *args, **kwargs: proglog.TqdmProgressBarLogger(print_messages=False, logger=None)
+# Even more aggressive: override the default logger entirely if possible
+try:
+    from proglog import MuhLogger
+    class NullLogger(MuhLogger):
+        def __init__(self, *args, **kwargs): pass
+        def __call__(self, *args, **kwargs): return self
+        def update(self, *args, **kwargs): pass
+    proglog.default_bar_logger = NullLogger
+except ImportError:
+    pass
 
 from nextcloud_client import NextcloudClient, sort_key
 
@@ -105,10 +119,22 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         slideshow_target_duration = max(0, target_video_duration - append_video_clip.duration)
         print(f"Adjusting slideshow duration to {slideshow_target_duration}s to accommodate appended video.")
 
-    clips = [ImageClip(np.array(Image.open(p))).set_duration(image_duration) for p in image_paths]
-    for clip in clips:
-        clip.fps = fps
+    # Standardize image size to 1920x1080
+    target_size = (1920, 1080)
+    print(f"Standardizing {len(image_paths)} images to {target_size}...")
     
+    clips = []
+    for p in image_paths:
+        try:
+            img = Image.open(p).convert("RGB")
+            if img.size != target_size:
+                img = img.resize(target_size, Image.ANTIALIAS)
+            clip = ImageClip(np.array(img)).set_duration(image_duration)
+            clip.fps = fps
+            clips.append(clip)
+        except Exception as e:
+            print(f"Warning: Could not process image {p}: {e}")
+
     if not clips:
         print("No valid image clips could be created. Exiting.")
         return
@@ -120,9 +146,8 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     slideshow_video = concatenate_videoclips(repeated_clips, method="compose")
     slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
     
-    # Add silent audio track to slideshow to match appended video
-    # This avoids NoneType errors during concatenation of audio tracks
-    silent_audio = AudioClip(lambda t: np.zeros((len(t) if hasattr(t, '__len__') else 1, 2)), duration=slideshow_target_duration, fps=44100)
+    # Simplified silent audio generator
+    silent_audio = AudioClip(lambda t: np.zeros((len(t) if np.ndim(t) > 0 else 1, 2)), duration=slideshow_target_duration, fps=44100)
     slideshow_video = slideshow_video.set_audio(silent_audio)
     slideshow_video.duration = slideshow_target_duration
     slideshow_video.fps = fps
