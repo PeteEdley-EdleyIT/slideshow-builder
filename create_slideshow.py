@@ -142,8 +142,11 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         final_video = slideshow_video
 
     final_video.fps = fps
+    if final_video.audio:
+        final_video.audio.duration = final_video.duration
+        final_video.audio.fps = 44100
 
-    print(f"Writing video to {output_filepath}...")
+    print(f"Writing video to {output_filepath} (Duration: {final_video.duration}s, FPS: {final_video.fps})...")
     output_dir = os.path.dirname(output_filepath)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -156,10 +159,11 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             fps=fps,
             codec="libx264",
             audio_codec="aac",
+            audio_fps=44100,
             temp_audiofile="temp-audio.m4a",
             remove_temp=True,
             verbose=False,
-            logger=None # MoviePy 1.0.3 uses logger='bar' by default, None or False should disable it
+            logger=None
         )
     except Exception as e:
         print(f"An error occurred during video writing: {e}")
