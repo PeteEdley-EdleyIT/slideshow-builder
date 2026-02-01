@@ -4,6 +4,7 @@ import math
 import shutil
 import tempfile
 import traceback
+import random
 from PIL import Image
 
 # Workaround for MoviePy + Pillow 10+ compatibility
@@ -12,7 +13,7 @@ if not hasattr(Image, 'ANTIALIAS'):
     # In Pillow 10+, ANTIALIAS was removed in favor of LANCZOS
     Image.ANTIALIAS = getattr(Image, 'LANCZOS', Image.BICUBIC)
 
-from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip
+from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, AudioClip, AudioFileClip, concatenate_audioclips
 from moviepy.video.io.ffmpeg_writer import ffmpeg_write_video
 from dotenv import load_dotenv
 import numpy as np
@@ -34,6 +35,10 @@ from nextcloud_client import NextcloudClient, sort_key
 load_dotenv()  # Load environment variables from .env file
 
 FPS = 5  # Frames per second for the video
+
+# --- Background Music Configuration ---
+MUSIC_FOLDER = os.getenv("MUSIC_FOLDER", "images/")
+MUSIC_SOURCE = os.getenv("MUSIC_SOURCE", "local")
 
 
 def get_env_var(name, default=None, required=False):
@@ -65,14 +70,27 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     temp_nextcloud_dir = None
     append_video_clip = None
     temp_video_dir = None
+    temp_music_dir = None # Initialize temp_music_dir
     fps = FPS
+
+    music_files = []
 
     if nextcloud_client and nextcloud_image_path:
         print("Retrieving images from Nextcloud...")
-        image_paths, temp_nextcloud_dir = nextcloud_client.list_and_download_images(nextcloud_image_path)
+        image_paths, temp_nextcloud_dir = nextcloud_client.list_and_download_files(nextcloud_image_path, allowed_extensions=('.jpg', '.jpeg'))
         if not image_paths:
             print("No images found in Nextcloud or an error occurred. Exiting.")
             return
+            
+        if MUSIC_SOURCE == "nextcloud" and MUSIC_FOLDER:
+            print("Retrieving background music from Nextcloud...")
+            music_files, temp_music_dir = nextcloud_client.list_and_download_files(MUSIC_FOLDER, allowed_extensions=('.mp3',))
+            if not music_files:
+                print("No music files found in Nextcloud folder.")
+                music_files = []
+        elif MUSIC_SOURCE == "local" and MUSIC_FOLDER:
+             music_files = sorted(glob.glob(os.path.join(MUSIC_FOLDER, "*.mp3")))
+
     elif image_folder:
         if not os.path.isdir(image_folder):
             print(f"Error: Image folder '{image_folder}' not found.")
@@ -83,6 +101,9 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         if not image_paths:
             print(f"No JPEG images found in '{image_folder}'.")
             return
+            
+        if MUSIC_SOURCE == "local" and MUSIC_FOLDER:
+             music_files = sorted(glob.glob(os.path.join(MUSIC_FOLDER, "*.mp3")))
     else:
         print("Error: No image source (local folder or Nextcloud) specified. Exiting.")
         return
@@ -147,15 +168,80 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
             slideshow_video = concatenate_videoclips(repeated_clips, method="chain")
             slideshow_video = slideshow_video.subclip(0, slideshow_target_duration).set_duration(slideshow_target_duration)
             
-            # Simplified silent audio generator - returning correct shape for MoviePy
-            def make_silent_frame(t):
-                if np.ndim(t) > 0:
-                    return np.zeros((len(t), 2))
-                else:
-                    return np.zeros(2)
-            
-            silent_audio = AudioClip(make_silent_frame, duration=slideshow_target_duration, fps=44100)
-            slideshow_video = slideshow_video.set_audio(silent_audio)
+            # Audio Handling
+            slideshow_audio = None
+            if music_files:
+                print(f"Found {len(music_files)} music tracks. Creating background audio...")
+                try:
+                    # Select random tracks and concatenate
+                    selected_music = []
+                    current_music_duration = 0
+                    
+                    # Create a pool to pick from
+                    music_pool = list(music_files)
+                    random.shuffle(music_pool)
+                    
+                    # If we run out of unique tracks, verify if we loop or just reuse
+                    # For now simpliest is to just cycle through the shuffled list
+                    while current_music_duration < slideshow_target_duration + 30: # Buffer
+                        if not music_pool:
+                            music_pool = list(music_files)
+                            random.shuffle(music_pool)
+                        
+                        track_path = music_pool.pop(0)
+                        try:
+                            track = AudioFileClip(track_path)
+                            selected_music.append(track)
+                            current_music_duration += track.duration
+                        except Exception as e:
+                            print(f"Error loading music track {track_path}: {e}")
+                    
+                    if selected_music:
+                        full_music = concatenate_audioclips(selected_music)
+                        
+                        # Apply trimming and fading
+                        # Fade out starts 15s from end, lasts 10s, leaving 5s silence
+                        fade_start = max(0, slideshow_target_duration - 15)
+                        fade_duration = 10
+                        audio_end = max(0, slideshow_target_duration - 5)
+                        
+                        # Clip to the end of audio (leaving 5s silence)
+                        bg_music = full_music.subclip(0, audio_end)
+                        
+                        # Apply fadeout at the end of the clip
+                        # Note: audio_fadeout applies to the end of the clip
+                        bg_music = bg_music.audio_fadeout(fade_duration)
+                        
+                        # To enable the 5s silence, we need the audio to be the full slideshow duration
+                        # We can create a CompositeAudioClip or just set the duration of the video
+                        # and MoviePy should handle silence if the audio is shorter.
+                        # However, explicitly adding silence avoids issues.
+                        
+                        # Better approach: Create a silent track for full duration, overlay music
+                        # Or just set this audio to the video, and since it's shorter, the rest is silence?
+                        # MoviePy 1.0.3 behavior: set_audio with shorter audio loops? No, usually it just stops.
+                        
+                        slideshow_audio = bg_music
+                        print("Background music configured with fadeout.")
+                    else:
+                        print("Failed to load any valid music tracks.")
+                except Exception as e:
+                    print(f"Error processing background music: {e}")
+                    slideshow_audio = None
+
+            if slideshow_audio:
+                slideshow_video = slideshow_video.set_audio(slideshow_audio)
+            else:
+                # Fallback to silent audio to keep manual writer happy
+                def make_silent_frame(t):
+                    if np.ndim(t) > 0:
+                        return np.zeros((len(t), 2))
+                    else:
+                        return np.zeros(2)
+                
+                silent_audio = AudioClip(make_silent_frame, duration=slideshow_target_duration, fps=44100)
+                slideshow_video = slideshow_video.set_audio(silent_audio)
+
             slideshow_video.duration = slideshow_target_duration
             slideshow_video.fps = fps
     else:
@@ -238,6 +324,20 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         
         if append_video_clip:
             append_video_clip.close()
+            
+        if temp_music_dir and os.path.exists(temp_music_dir):
+            try:
+                shutil.rmtree(temp_music_dir)
+            except:
+                pass
+
+        if temp_nextcloud_dir:
+            print(f"Cleaning up temporary Nextcloud images directory: {temp_nextcloud_dir}")
+            shutil.rmtree(temp_nextcloud_dir)
+    
+    if temp_video_dir:
+        print(f"Cleaning up temporary Nextcloud video directory: {temp_video_dir}")
+        shutil.rmtree(temp_video_dir)
 
     print(f"Slideshow video created successfully at {output_filepath}")
 

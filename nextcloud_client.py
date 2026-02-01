@@ -39,10 +39,14 @@ class NextcloudClient:
         path_encoded = quote(path.strip('/'), safe='/')
         return f"{self.base_url}remote.php/dav/files/{user_encoded}/{path_encoded}"
 
-    def list_and_download_images(self, remote_path):
+    def list_and_download_files(self, remote_path, allowed_extensions=None):
         """
-        Lists images in a Nextcloud folder, downloads them to a temporary
+        Lists files in a Nextcloud folder, downloads them to a temporary
         directory, and returns the sorted list of local paths.
+        
+        :param remote_path: Path on Nextcloud to list/download from.
+        :param allowed_extensions: Tuple of allowed file extensions (e.g., ('.jpg', '.png')). 
+                                   If None, all files are downloaded.
         """
         propfind_url = self._get_webdav_url(remote_path)
         temp_dir = tempfile.mkdtemp()
@@ -62,8 +66,12 @@ class NextcloudClient:
                     continue
 
                 file_href = href_elem.text
-                if file_href == remote_path or not (file_href.lower().endswith(('.jpg', '.jpeg'))):
+                if file_href == remote_path:
                     continue
+                    
+                if allowed_extensions:
+                    if not file_href.lower().endswith(allowed_extensions):
+                        continue
 
                 download_url = f"{self.base_url}{file_href.lstrip('/')}"
                 local_filename = os.path.join(temp_dir, os.path.basename(file_href))
