@@ -1,4 +1,8 @@
 import os
+import sys
+
+print(f"DEBUG: Working directory: {os.getcwd()}")
+print(f"DEBUG: sys.path: {sys.path}")
 import glob
 import math
 import shutil
