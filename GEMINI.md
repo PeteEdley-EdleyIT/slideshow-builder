@@ -97,3 +97,6 @@ podman rm notices-automation
 - [x] Background Music: Specify folder (local/Nextcloud), random selection, fade out over last 15s (10s fade, 5s silence) of slideshow.
 - [x] Notification System: Send success/failure messages to a Matrix chat room, including the list of slides or error details.
 
+## Future Ideas
+- [ ] Interactive Matrix Bot: Convert the script into a long-running daemon (replacing Cron) to allow receiving commands from Matrix (e.g., `!rebuild` to trigger an immediate video generation). This would use `matrix-nio` for async communication.
+
