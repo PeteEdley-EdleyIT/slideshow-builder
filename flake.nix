@@ -28,7 +28,7 @@
           ]
         );
 
-        appSrc = pkgs.lib.cleanSource ./.; # Get all files in the current directory
+        appSrc = ./.; # Get all files in the current directory (Flakes only see tracked files)
 
         appDir = pkgs.stdenv.mkDerivation {
           name = "notices-video-automation-app";
@@ -102,6 +102,7 @@
                   pkgs.gnused
                 ]
               }"
+              "PYTHONPATH=/app"
               "PYTHONUNBUFFERED=1"
             ];
           };

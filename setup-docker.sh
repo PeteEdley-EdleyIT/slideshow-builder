@@ -13,7 +13,7 @@ printenv | grep -v "no_proxy" | sed "s/^\([^=]*\)=\(.*\)/export \1='\2'/" > /app
 CRON_SCHEDULE=${CRON_SCHEDULE:-"0 1 * * 5"}
 # Strip potential surrounding quotes
 CRON_SCHEDULE=$(echo "$CRON_SCHEDULE" | sed 's/^"//;s/"$//')
-echo "$CRON_SCHEDULE . /app/.env.cron; python3 /app/create_slideshow.py >> /var/log/slideshow.log 2>&1" > /tmp/crontab.root
+echo "$CRON_SCHEDULE . /app/.env.cron; cd /app && python3 create_slideshow.py >> /var/log/slideshow.log 2>&1" > /tmp/crontab.root
 
 # Install crontab
 crontab /tmp/crontab.root
