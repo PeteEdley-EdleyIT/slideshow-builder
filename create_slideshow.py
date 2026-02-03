@@ -32,6 +32,7 @@ class NullLogger(proglog.ProgressBarLogger):
 proglog.default_bar_logger = lambda *args, **kwargs: NullLogger()
 
 from nextcloud_client import NextcloudClient, sort_key
+from matrix_client import MatrixClient
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -73,15 +74,13 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     temp_video_dir = None
     temp_music_dir = None # Initialize temp_music_dir
     fps = FPS
-
     music_files = []
 
     if nextcloud_client and nextcloud_image_path:
         print("Retrieving images from Nextcloud...")
         image_paths, temp_nextcloud_dir = nextcloud_client.list_and_download_files(nextcloud_image_path, allowed_extensions=('.jpg', '.jpeg'))
         if not image_paths:
-            print("No images found in Nextcloud or an error occurred. Exiting.")
-            return
+            raise RuntimeError("No images found in Nextcloud or an error occurred.")
             
         if MUSIC_SOURCE == "nextcloud" and MUSIC_FOLDER:
             print("Retrieving background music from Nextcloud...")
@@ -95,19 +94,20 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     elif image_folder:
         if not os.path.isdir(image_folder):
             print(f"Error: Image folder '{image_folder}' not found.")
-            return
+            raise FileNotFoundError(f"Image folder '{image_folder}' not found.")
         image_paths = glob.glob(os.path.join(image_folder, "*.jpg"))
         image_paths.extend(glob.glob(os.path.join(image_folder, "*.jpeg")))
         image_paths.sort(key=sort_key)
         if not image_paths:
-            print(f"No JPEG images found in '{image_folder}'.")
-            return
+            raise RuntimeError(f"No JPEG images found in '{image_folder}'.")
             
         if MUSIC_SOURCE == "local" and MUSIC_FOLDER:
              music_files = sorted(glob.glob(os.path.join(MUSIC_FOLDER, "*.mp3")))
     else:
-        print("Error: No image source (local folder or Nextcloud) specified. Exiting.")
-        return
+        raise ValueError("No image source (local folder or Nextcloud) specified.")
+    
+    # Store just the filenames for reporting
+    included_slides = [os.path.basename(p) for p in image_paths]
 
     # Handle optional video append
     if append_video_path:
@@ -161,6 +161,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
         if not clips:
             print("No valid image clips could be created. Proceeding with append video only.")
             slideshow_video = None
+            included_slides = []
         else:
             sequence_duration = len(clips) * image_duration
             num_repeats = math.ceil(slideshow_target_duration / sequence_duration) if sequence_duration > 0 else 1
@@ -289,8 +290,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     elif slideshow_video:
         final_video = slideshow_video
     else:
-        print("Error: No video content to write. Exiting.")
-        return
+        raise RuntimeError("No video content (slideshow or append video) to write.")
 
     # Ensure fps is a float and not None
     if fps is None:
@@ -335,7 +335,7 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
     except Exception as e:
         print(f"An error occurred during manual video writing: {e}")
         traceback.print_exc()
-        return
+        raise e # Re-raise to be caught in main() for notification
     finally:
         if audio_temp and os.path.exists(audio_temp):
             try:
@@ -365,6 +365,8 @@ def create_slideshow(output_filepath, image_duration, target_video_duration,
 
     if nextcloud_client and nextcloud_upload_path:
         nextcloud_client.upload_file(output_filepath, nextcloud_upload_path)
+        
+    return included_slides
 
 
 def get_config():
@@ -384,6 +386,9 @@ def get_config():
         "nc_insecure": get_env_bool("NEXTCLOUD_INSECURE_SSL", False),
         "append_video_path": get_env_var("APPEND_VIDEO_PATH"),
         "append_video_source": get_env_var("APPEND_VIDEO_SOURCE", "local"),
+        "matrix_homeserver": get_env_var("MATRIX_HOMESERVER"),
+        "matrix_token": get_env_var("MATRIX_ACCESS_TOKEN"),
+        "matrix_room": get_env_var("MATRIX_ROOM_ID"),
     }
     return config
 
@@ -413,8 +418,10 @@ def main():
         else:
             raise ValueError("OUTPUT_FILEPATH is required if UPLOAD_NEXTCLOUD_PATH is not set.")
 
+    matrix = MatrixClient(config["matrix_homeserver"], config["matrix_token"], config["matrix_room"])
+
     try:
-        create_slideshow(
+        included_slides = create_slideshow(
             output_filepath=final_output_filepath,
             image_duration=config["image_duration"],
             target_video_duration=config["target_video_duration"],
@@ -425,6 +432,23 @@ def main():
             append_video_path=config["append_video_path"],
             append_video_source=config["append_video_source"]
         )
+        
+        if matrix.is_configured():
+            video_name = config["nc_upload_path"] if config["nc_upload_path"] else os.path.basename(final_output_filepath)
+            matrix.send_success(video_name, included_slides)
+
+    except Exception as e:
+        error_msg = str(e)
+        trace_str = traceback.format_exc()
+        print(f"APPLICATION ERROR: {error_msg}")
+        print(trace_str)
+        if matrix.is_configured():
+            matrix.send_failure(error_msg, trace_str)
+        else:
+            print("Matrix not configured, cannot send failure notification.")
+        # Exit with error code for cron/docker to see
+        import sys
+        sys.exit(1)
     finally:
         if temp_output_file_created and os.path.exists(final_output_filepath):
             print(f"Cleaning up temporary output file: {final_output_filepath}")

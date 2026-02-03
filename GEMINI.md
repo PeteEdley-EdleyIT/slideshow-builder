@@ -7,6 +7,14 @@ Here are a list of required features to work through one by one we will not be m
 # Development enviroment
 The development enviroment will be a nixos machine and we will developing in python, using gemini-cli.  The development enviroment will be set up using via a nix flake and all project dependancies will be managed by the flake instead of somthing like pip and a venv.
 
+## Local Execution
+To run the script locally for testing:
+1. Ensure your environment is set up (either via `nix develop` or by sourcing the `.venv`).
+2. Run the script:
+   ```bash
+   python3 create_slideshow.py
+   ```
+
 # Deployment
 Final deployment is via a container image, built using Nix. The script runs via a cron job within the container. Configuration is managed via environment variables, which should be set in a `.env` file.
 
@@ -87,4 +95,5 @@ podman rm notices-automation
 - [x] Make cron schedule configurable via environment variable.
 - [x] Optionally append a video file (local or Nextcloud) to the end of the slideshow, adjusting slide duration to maintain target video length.
 - [x] Background Music: Specify folder (local/Nextcloud), random selection, fade out over last 15s (10s fade, 5s silence) of slideshow.
+- [x] Notification System: Send success/failure messages to a Matrix chat room, including the list of slides or error details.
 
