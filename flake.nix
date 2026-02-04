@@ -25,6 +25,12 @@
             requests
             python-dotenv
             setuptools
+            apscheduler
+            matrix-nio
+            python-olm
+            cachetools
+            atomicwrites
+            peewee
           ]
         );
 
