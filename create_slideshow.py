@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 
 #print(f"DEBUG: Working directory: {os.getcwd()}")
 #print(f"DEBUG: sys.path: {sys.path}")
@@ -34,6 +35,8 @@ from nextcloud_client import NextcloudClient, sort_key
 from matrix_client import MatrixClient
 from audio_manager import AudioManager
 from slideshow_generator import SlideshowGenerator
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 load_dotenv()
 
@@ -192,18 +195,23 @@ class Config:
         self.matrix_homeserver = get_env_var("MATRIX_HOMESERVER")
         self.matrix_token = get_env_var("MATRIX_ACCESS_TOKEN")
         self.matrix_room = get_env_var("MATRIX_ROOM_ID")
+        self.matrix_user_id = get_env_var("MATRIX_USER_ID")
 
 
-def main():
+async def run_automation(matrix=None):
     """
-    Main entry point for the slideshow automation.
+    The core logic for the slideshow automation, designed to be called by a scheduler or manual trigger.
     """
     config = Config()
-    matrix = MatrixClient(config.matrix_homeserver, config.matrix_token, config.matrix_room)
+    created_matrix = False
+    if not matrix:
+        matrix = MatrixClient(config.matrix_homeserver, config.matrix_token, config.matrix_room, config.matrix_user_id)
+        created_matrix = True
     client = None
     temp_output_file = None
 
     try:
+        print("Starting scheduled slideshow automation...")
         if config.nc_url and config.nc_user:
             client = NextcloudClient(config.nc_url, config.nc_user, config.nc_pass, verify_ssl=not config.nc_insecure)
 
@@ -220,19 +228,92 @@ def main():
         
         if matrix.is_configured():
             video_name = config.nc_upload_path or os.path.basename(output_path)
-            matrix.send_success(video_name, included_slides)
+            await matrix.send_success(video_name, included_slides)
+        
+        print("Scheduled slideshow automation complete.")
 
     except Exception as e:
         error_msg = str(e)
         trace_str = traceback.format_exc()
-        print(f"FATAL ERROR: {error_msg}\n{trace_str}")
+        print(f"ERROR: {error_msg}\n{trace_str}")
         if matrix.is_configured():
-            matrix.send_failure(error_msg, trace_str)
-        sys.exit(1)
+            await matrix.send_failure(error_msg, trace_str)
     finally:
+        if created_matrix and matrix and matrix.is_configured():
+            await matrix.close()
         if temp_output_file and os.path.exists(temp_output_file):
             os.remove(temp_output_file)
 
 
+async def handle_matrix_message(matrix, room, event):
+    """
+    Handle incoming Matrix messages.
+    """
+    command = event.body.strip()
+    print(f"DEBUG: Processing command: '{command}' from {event.sender}")
+    
+    # Security: In a real scenario, you'd check event.sender here.
+    if command == "!rebuild":
+        await matrix.send_message("🚀 Starting manual rebuild...")
+        asyncio.create_task(run_automation(matrix))
+    elif command == "!status":
+        await matrix.send_message("🤖 Notices Bot is online and scheduled.")
+    elif command == "!help":
+        help_text = (
+            "Available commands:\n"
+            "!rebuild - Trigger a manual video generation\n"
+            "!status - Check if the bot is alive\n"
+            "!help - Show this message"
+        )
+        await matrix.send_message(help_text)
+
+
+async def main():
+    """
+    Main entry point for the long-running daemon.
+    """
+    config = Config()
+    cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5")
+    
+    matrix = MatrixClient(config.matrix_homeserver, config.matrix_token, config.matrix_room, config.matrix_user_id)
+    
+    print(f"Starting Matrix bot daemon with cron schedule: {cron_schedule}")
+    
+    scheduler = AsyncIOScheduler()
+    
+    # Add the scheduled job
+    try:
+        trigger = CronTrigger.from_crontab(cron_schedule)
+        scheduler.add_job(run_automation, trigger, args=[matrix], id="slideshow_job")
+        print(f"Scheduled slideshow job with crontab: {cron_schedule}")
+    except Exception as e:
+        print(f"Failed to schedule job with cron '{cron_schedule}': {e}")
+        print("Falling back to default Friday 1:00 AM schedule.")
+        scheduler.add_job(run_automation, CronTrigger.from_crontab("0 1 * * 5"), args=[matrix], id="slideshow_job")
+
+    scheduler.start()
+
+    # Matrix Listener
+    if matrix.is_configured():
+        matrix.add_message_callback(lambda room, event: handle_matrix_message(matrix, room, event))
+        # Run the listener in a background task
+        listener_task = asyncio.create_task(matrix.listen_forever())
+        print("Matrix listener started.")
+    else:
+        print("Matrix not configured, running in scheduler-only mode.")
+        listener_task = None
+
+    # Keep the script running
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
+        if matrix:
+            await matrix.close()
+        if listener_task:
+            listener_task.cancel()
+
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

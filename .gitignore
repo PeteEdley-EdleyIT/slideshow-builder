@@ -21,3 +21,4 @@ images/
 
 # Environment variables
 .env
+matrix_store/
