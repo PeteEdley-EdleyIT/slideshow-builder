@@ -1,19 +1,51 @@
+"""
+Matrix Client for sending notifications and handling interactive commands.
+
+This module provides the `MatrixClient` class, which uses the `matrix-nio`
+library to connect to a Matrix homeserver, send messages to a specific room,
+and listen for incoming commands. It includes basic support for End-to-End
+Encryption (E2EE) by automatically trusting devices and requesting room keys.
+"""
+
 import os
 import logging
 import asyncio
 from nio import AsyncClient, RoomMessageText, MegolmEvent, AsyncClientConfig, RoomKeyRequest, KeyVerificationEvent, KeyVerificationCancel, ToDeviceMessage
 import time
 
+# Configure logging for matrix-nio to suppress excessive debug output
+logging.getLogger("nio").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
 class MatrixClient:
+    """
+    A client for interacting with a Matrix instance using the matrix-nio library.
+
+    This class facilitates sending messages (success/failure notifications)
+    and listening for commands in a specified Matrix room. It supports
+    End-to-End Encryption (E2EE) by managing device verification and key requests.
+
+    Attributes:
+        homeserver_url (str): The base URL of the Matrix homeserver.
+        access_token (str): The access token for the bot's Matrix account.
+        room_id (str): The ID of the Matrix room for communication.
+        user_id (str): The full Matrix ID of the bot user.
+        store_path (str): Local directory to store encryption keys and client data.
+        client (AsyncClient): The underlying `matrix-nio` AsyncClient instance.
+    """
     def __init__(self, homeserver_url, access_token, room_id, user_id=None, store_path="matrix_store"):
         """
-        Initialize the Matrix client using matrix-nio.
-        
-        :param homeserver_url: The base URL of the Matrix homeserver (e.g., https://matrix.org)
-        :param access_token: The access token for the bot/user account
-        :param room_id: The ID of the room to send messages to (e.g., !roomid:example.com)
-        :param user_id: The full Matrix ID of the bot (e.g., @bot:example.com)
-        :param store_path: Directory to store encryption keys (for E2EE)
+        Initializes the Matrix client.
+
+        Args:
+            homeserver_url (str): The base URL of the Matrix homeserver (e.g., https://matrix.org).
+            access_token (str): The access token for the bot/user account.
+            room_id (str): The ID of the room to send messages to (e.g., !roomid:example.com).
+            user_id (str, optional): The full Matrix ID of the bot (e.g., @bot:example.com).
+                                     If None, it will attempt to derive it later.
+            store_path (str, optional): Directory to store encryption keys and client data.
+                                        Defaults to "matrix_store".
         """
         self.homeserver_url = homeserver_url.rstrip('/') if homeserver_url else None
         self.access_token = access_token
@@ -21,24 +53,37 @@ class MatrixClient:
         self.user_id = user_id
         self.store_path = store_path
         self.client = None
+        self._message_callback = None # Callback for handling incoming messages
 
     def is_configured(self):
+        """
+        Checks if the Matrix client has sufficient configuration to operate.
+
+        Returns:
+            bool: True if homeserver_url, access_token, and room_id are all set, False otherwise.
+        """
         return bool(self.homeserver_url and self.access_token and self.room_id)
 
     async def _ensure_client(self):
+        """
+        Ensures that the `matrix-nio` AsyncClient is initialized and configured.
+
+        This method creates the client if it doesn't exist, sets up encryption,
+        and configures the access token and user ID.
+        """
         if self.client is None:
-            # Create store path if it doesn't exist
+            # Create store path if it doesn't exist for E2EE data
             if self.store_path and not os.path.exists(self.store_path):
                 os.makedirs(self.store_path)
 
-            # Configure client with encryption ENABLED
+            # Configure client with encryption ENABLED and store sync tokens
             client_config = AsyncClientConfig(
                 encryption_enabled=True,
                 store_sync_tokens=True
             )
             self.client = AsyncClient(
-                self.homeserver_url, 
-                self.user_id or "", 
+                self.homeserver_url,
+                self.user_id or "", # user_id can be empty initially if not provided
                 ssl=True,
                 store_path=self.store_path,
                 config=client_config
@@ -46,19 +91,27 @@ class MatrixClient:
             self.client.access_token = self.access_token
             if self.user_id:
                 self.client.user_id = self.user_id
-            
+            # Set a custom device ID if needed, otherwise nio generates one
+            # self.client.device_id = "slideshow-bot-device"
 
 
     async def send_message(self, message, html_message=None):
         """
-        Send a message to the configured Matrix room using matrix-nio.
+        Sends a message to the configured Matrix room.
+
+        Args:
+            message (str): The plain text message content.
+            html_message (str, optional): The HTML formatted message content. Defaults to None.
+
+        Returns:
+            bool: True if the message was sent successfully, False otherwise.
         """
         if not self.is_configured():
             print("Matrix configuration missing or incomplete. Skipping notification.")
             return False
 
         try:
-            await self._ensure_client()
+            await self._ensure_client() # Ensure client is ready
             
             content = {
                 "msgtype": "m.text",
@@ -69,11 +122,13 @@ class MatrixClient:
                 content["format"] = "org.matrix.custom.html"
                 content["formatted_body"] = html_message
 
+            # Send the message to the room, ignoring unverified devices for simplicity
+            # In a production E2EE setup, more robust device verification might be needed
             response = await self.client.room_send(
                 room_id=self.room_id,
                 message_type="m.room.message",
                 content=content,
-                ignore_unverified_devices=True
+                ignore_unverified_devices=True # This is important for E2EE rooms
             )
             
             # Check if response is successful
@@ -88,13 +143,20 @@ class MatrixClient:
             print(f"Error in MatrixClient.send_message: {e}")
             return False
         finally:
-            # We don't close the client here as it might be reused.
-            # In a daemon, we might want to keep it open.
+            # In a long-running daemon, we generally keep the client open.
+            # It will be closed on application shutdown.
             pass
 
     async def send_success(self, video_name, slide_list):
         """
-        Send a success notification.
+        Sends a success notification message to the Matrix room.
+
+        Args:
+            video_name (str): The name of the generated video.
+            slide_list (list): A list of image basenames included in the slideshow.
+
+        Returns:
+            bool: True if the message was sent successfully, False otherwise.
         """
         slides_str = "\n".join([f"- {s}" for s in slide_list])
         message = f"✅ Slideshow produced successfully!\nVideo: {video_name}\nIncluded slides:\n{slides_str}"
@@ -111,7 +173,14 @@ class MatrixClient:
 
     async def send_failure(self, error_message, traceback_str=None):
         """
-        Send a failure notification.
+        Sends a failure notification message to the Matrix room.
+
+        Args:
+            error_message (str): A brief description of the error.
+            traceback_str (str, optional): The full traceback string for debugging. Defaults to None.
+
+        Returns:
+            bool: True if the message was sent successfully, False otherwise.
         """
         message = f"❌ Slideshow production failed!\nError: {error_message}"
         if traceback_str:
@@ -128,38 +197,59 @@ class MatrixClient:
 
     def add_message_callback(self, callback):
         """
-        Add a callback for incoming messages.
-        The callback should be an async function taking (room, event).
+        Registers a callback function to be called when an incoming message is received.
+
+        The callback function should be an asynchronous function that accepts
+        `room_id` (str) and `event` (nio.events.room_events.RoomMessageText) as arguments.
+
+        Args:
+            callback (callable): The async function to be called on message receipt.
         """
         self._message_callback = callback
 
     async def _on_message(self, room_id, event):
+        """
+        Internal callback handler for incoming Matrix messages.
+
+        This method filters out messages sent by the bot itself and
+        dispatches valid messages to the registered `_message_callback`.
+
+        Args:
+            room_id (str): The ID of the room where the message was sent.
+            event (nio.events.room_events.RoomMessageText): The incoming message event.
+        """
         print(f"DEBUG: Received event type {type(event).__name__} from {event.sender}")
         print(f"DEBUG: Comparing sender '{event.sender}' with bot ID '{self.client.user_id}'")
-        # Ignore our own messages
+        # Ignore our own messages to prevent infinite loops
         if event.sender == self.client.user_id:
             print("DEBUG: Ignoring our own message.")
             return
 
         print(f"DEBUG: Received Matrix event in room {room_id} (Target: {self.room_id}) from {event.sender}: {event.body}")
+        # Process messages only from the configured room
         if room_id == self.room_id:
-            if hasattr(self, '_message_callback') and self._message_callback:
-                # We pass the room_id string as the first argument to the callback
+            if self._message_callback:
+                # Call the registered message handler
                 await self._message_callback(room_id, event)
         else:
             print(f"DEBUG: Event ignored (wrong room)")
 
     async def listen_forever(self):
         """
-        Start a manual sync loop to listen for events.
+        Starts a continuous sync loop to listen for Matrix events.
+
+        This method connects to the homeserver, joins the configured room,
+        loads encryption keys, and processes incoming messages and encrypted events.
+        It attempts to auto-trust devices and request keys for E2EE messages.
         """
         if not self.is_configured():
             print("Matrix configuration missing. Cannot listen.")
             return
 
-        await self._ensure_client()
+        await self._ensure_client() # Ensure client is initialized
 
         # Auto-detect device ID and initialize crypto
+        # This is crucial for E2EE to work correctly
         try:
             whoami_resp = await self.client.whoami()
             if hasattr(whoami_resp, 'device_id') and whoami_resp.device_id:
@@ -168,9 +258,11 @@ class MatrixClient:
             print(f"Error detecting device ID: {e}")
 
         # Initial sync to load account and crypto store
+        # full_state=True ensures we get enough info for E2EE
         sync_resp = await self.client.sync(timeout=3000, full_state=True)
         
         # Load Olm machine for E2EE
+        # This loads the encryption keys from the store_path
         if self.client.device_id:
             try:
                 self.client.load_store()
@@ -178,52 +270,62 @@ class MatrixClient:
                     self.client.olm.load()
             except Exception as e:
                 print(f"Error loading crypto: {e}")
+        
+        # Join the configured room if not already joined
         await self.client.join(self.room_id)
         
-        # Send initialization message
-        await self.send_message("🤖 Notices Bot is starting and listening for commands...")
+        # Send an initial message to confirm bot is starting
+        await self.send_message("🤖 Slideshow Bot is starting and listening for commands...")
 
-        # Initial sync to get starting token
+        # Perform an initial sync to get the starting token for subsequent syncs
         sync_resp = await self.client.sync(timeout=30000)
-        next_batch = sync_resp.next_batch
+        next_batch = sync_resp.next_batch # Token for the next sync request
         
         print(f"Matrix bot listening for messages in {self.room_id} starting at {next_batch}...")
         
         while True:
             try:
+                # Continuous sync loop to fetch new events
                 sync_resp = await self.client.sync(timeout=30000, since=next_batch)
-                next_batch = sync_resp.next_batch
+                next_batch = sync_resp.next_batch # Update token for next iteration
                 
-                # Process to-device events for E2EE
+                # Process to-device events (e.g., key requests, device list updates)
                 if sync_resp.to_device_events:
                     for e in sync_resp.to_device_events:
-                        pass  # Callbacks handle these automatically 
+                        # matrix-nio's internal callbacks handle most to-device events
+                        pass
 
-                # Process room events
+                # Process room events (messages, encrypted events)
                 for room_id, room in sync_resp.rooms.join.items():
                     for event in room.timeline.events:
                         if isinstance(event, RoomMessageText):
+                            # Handle plain text messages
                             await self._on_message(room_id, event)
                         elif isinstance(event, MegolmEvent):
-                            # Encrypted message - auto-trust sender and request keys
+                            # Handle encrypted messages (E2EE)
                             try:
+                                # Perform a quick sync to ensure device lists are up-to-date
                                 await self.client.sync(timeout=1000)
+                                # Attempt to verify sender's devices and request keys
                                 devices = list(self.client.device_store.active_user_devices(event.sender))
                                 for device in devices:
+                                    # Auto-trust devices for simplicity in this bot context
+                                    # In a user client, this would involve user confirmation
                                     self.client.verify_device(device)
                                 await self.client.request_room_key(event)
                             except Exception as e:
-                                print(f"Failed to request encryption key: {e}")
-
-
-                
+                                print(f"Failed to request encryption key for event {event.event_id}: {e}")
+                                # Log the error but continue processing
             except Exception as e:
                 import traceback
                 print(f"Error in Matrix sync loop: {e}")
                 traceback.print_exc()
-                await asyncio.sleep(5)
+                await asyncio.sleep(5) # Wait before retrying to prevent busy-looping
 
     async def close(self):
+        """
+        Closes the Matrix client connection gracefully.
+        """
         if self.client:
             await self.client.close()
             self.client = None
