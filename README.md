@@ -1,4 +1,4 @@
-# MCF Notices Video Automation
+# Video Slideshow Automation
 
 This project automatically creates video slideshows from image and music files, designed for easy deployment and hands-off operation. It integrates with Nextcloud for media sourcing and output, and features a Matrix bot for notifications and simple command-based control.
 
@@ -49,13 +49,13 @@ podman run -d \
   --name notices-automation \
   --restart always \
   --env-file .env \
-  localhost/mcf-notices-builder:latest
+  localhost/slideshow-builder:latest
 ```
     *   `-d`: Runs the container in detached mode (in the background).
     *   `--name notices-automation`: Assigns a memorable name to your container.
     *   `--restart always`: Ensures the container automatically restarts if it stops or the system reboots.
     *   `--env-file .env`: Mounts your `.env` file into the container for configuration.
-    *   `localhost/mcf-notices-builder:latest`: Specifies the image to run.
+    *   `localhost/slideshow-builder:latest`: Specifies the image to run.
 
 #### With Docker
 
@@ -69,7 +69,7 @@ docker run -d \
   --name notices-automation \
   --restart always \
   --env-file .env \
-  localhost/mcf-notices-builder:latest
+  localhost/slideshow-builder:latest
 ```
     The options are the same as for Podman.
 
@@ -82,7 +82,7 @@ version: '3.8'
 
 services:
   notices-automation:
-    image: localhost/mcf-notices-builder:latest
+    image: localhost/slideshow-builder:latest
     container_name: notices-automation
     restart: always
     env_file:
@@ -117,6 +117,37 @@ podman restart notices-automation
 # OR
 docker restart notices-automation
 ```
+### Updating the Automation
+
+To apply updates (e.g., after building a new version of the image with code changes or updated dependencies):
+
+1.  Stop and remove the old container:
+    ```bash
+podman stop notices-automation && podman rm notices-automation
+# OR
+docker stop notices-automation && docker rm notices-automation
+```
+    If using `docker-compose`, simply run `docker-compose down`.
+2.  Re-run the updated `podman run` or `docker run` command from the "Running the Container" section above, or `docker-compose up -d` if using Docker Compose.
+
+### Pushing to a Container Registry (Optional)
+
+If you need to move your image to a different machine or share it via a container registry (like Docker Hub):
+
+1.  **Tag the image:**
+    ```bash
+podman tag localhost/slideshow-builder:latest yourusername/slideshow-builder:latest
+# OR
+docker tag localhost/slideshow-builder:latest yourusername/slideshow-builder:latest
+```
+    (Replace `yourusername` with your registry username)
+2.  **Push the image:**
+    ```bash
+podman push yourusername/slideshow-builder:latest
+# OR
+docker push yourusername/slideshow-builder:latest
+```
+
 ## Matrix Bot Usage
 
 Your automation bot will send notifications and respond to commands in the Matrix room you configured.
