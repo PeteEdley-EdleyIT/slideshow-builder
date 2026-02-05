@@ -1,4 +1,4 @@
-# MCF Notices Video Automation
+# Video Slideshow Automation
 
 This project is going to take a folder full of images in a jpeg format, and cobine them together into a video slide show.
 
@@ -36,7 +36,7 @@ This command builds the image and creates a `result` symlink to the `.tar.gz` ar
       --name notices-automation \
       --restart always \
       --env-file .env \
-      localhost/mcf-notices-builder:latest
+localhost/slideshow-builder:latest
     ```
 
 ## Management Commands
@@ -68,11 +68,11 @@ podman rm notices-automation
 ## Pushing to a Registry
 1.  **Tag the image:**
     ```bash
-    podman tag localhost/mcf-notices-builder:latest docker.io/pedley/mcf-notices-builder:latest
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
     ```
 2.  **Push the image:**
     ```bash
-    podman push docker.io/pedley/mcf-notices-builder:latest
+    podman push docker.io/pedley/slideshow-builder:latest
     ```
 
 # Features

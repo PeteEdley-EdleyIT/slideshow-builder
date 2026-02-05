@@ -84,7 +84,7 @@
 
         # Define a Docker image output
         packages.dockerImage = pkgs.dockerTools.buildImage {
-          name = "mcf-notices-builder";
+          name = "slideshow-builder";
           tag = "latest";
 
           copyToRoot = [ rootContents ];

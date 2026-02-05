@@ -1,4 +1,4 @@
-# MCF Notices Video Automation
+# Video Slideshow Automation
 
 **Automate the creation of dynamic video slideshows from your images and music, with seamless Nextcloud integration and Matrix bot control.**
 
@@ -25,14 +25,14 @@ To quickly get the automation running, follow these steps. For full details on c
 
     **With Podman:**
     ```bash
-    podman pull pedley/mcf-notices-builder:latest
-    podman run -d --name notices-automation --restart always --env-file .env pedley/mcf-notices-builder:latest
+    pedley/slideshow-builder:latest
+    podman run -d --name notices-automation --restart always --env-file .env pedley/slideshow-builder:latest
     ```
 
     **With Docker:**
     ```bash
-    docker pull pedley/mcf-notices-builder:latest
-    docker run -d --name notices-automation --restart always --env-file .env pedley/mcf-notices-builder:latest
+    docker pull pedley/slideshow-builder:latest
+    docker run -d --name notices-automation --restart always --env-file .env pedley/slideshow-builder:latest
     ```
 
     **Using Docker Compose (Recommended for Docker Users):**
@@ -41,7 +41,7 @@ To quickly get the automation running, follow these steps. For full details on c
     version: '3.8'
     services:
       notices-automation:
-        image: pedley/mcf-notices-builder:latest
+        image: pedley/slideshow-builder:latest
         container_name: notices-automation
         restart: always
         env_file:
