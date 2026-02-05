@@ -25,7 +25,7 @@ To quickly get the automation running, follow these steps. For full details on c
 
     **With Podman:**
     ```bash
-    pedley/slideshow-builder:latest
+    podman pull pedley/slideshow-builder:latest
     podman run -d --name notices-automation --restart always --env-file .env pedley/slideshow-builder:latest
     ```
 

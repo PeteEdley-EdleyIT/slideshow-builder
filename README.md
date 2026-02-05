@@ -178,6 +178,6 @@ All aspects of the slideshow automation are configured via environment variables
 | `MUSIC_SOURCE`           | Specifies where the automation should find background music files: `local` for a local folder, or `nextcloud` for a Nextcloud path. | `local`         |
 | `MATRIX_HOMESERVER`      | The URL of your Matrix homeserver (e.g., `https://matrix.org`). Required for Matrix bot functionality. | (None)          |
 | `MATRIX_ACCESS_TOKEN`    | An access token for your Matrix bot user. This token *must* have sufficient permissions (read/write to the room, send messages). Essential for Matrix bot. | (None)          |
-| `MATRIX_ROOM_ID`         | The internal ID of the Matrix room where the bot will operate. This is often a string like `!roomid:homeserver.com`. Required for Matrix bot. | (None)          |
+| `MATRIX_ROOM_ID`         | The internal ID of the Matrix room where the bot will operate. This is often a string like `!roomid:homeserver.com`. Required for Matrix bot. | (None)          | 
 | `MATRIX_USER_ID`         | The full Matrix user ID of your bot (e.g., `@botname:yourhomeserver.com`). Required for Matrix bot.    | (None)          |
 | `CRON_SCHEDULE`          | A cron expression that defines the schedule for automatic video generation. For example, `0 1 * * 5` means "every Friday at 1:00 AM". | `0 1 * * 5`     |
