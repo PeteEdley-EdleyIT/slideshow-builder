@@ -54,7 +54,7 @@ class HealthManager:
         self.last_success_time = None
         self.last_heartbeat_time = None
 
-    def update_heartbeat(self):
+    async def update_heartbeat(self):
         """
         Updates the heartbeat file with the current timestamp.
         
@@ -62,6 +62,8 @@ class HealthManager:
         the health of the daemon.
         """
         try:
+            # File I/O is usually blocking, but for a tiny heartbeat it's fine.
+            # Making this async as it's orchestrated by the async loop.
             with open(self.HEARTBEAT_FILE, "w") as f:
                 f.write(str(time.time()))
             self.last_heartbeat_time = time.time()
