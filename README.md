@@ -21,6 +21,7 @@ This project automatically creates video slideshows from image and music files, 
     *   **Podman Native Healthcheck:** Use a liveness pulse (heartbeat file) to monitor the container's health.
     *   **ntfy.sh Integration:** Receive instant push notifications for successful builds or critical failures on your self-hosted ntfy server.
     *   **Proactive Status Reporting:** Matrix `!status` command provides detailed metrics (uptime, last success, last heartbeat).
+*   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
 *   **Containerized for Easy Deployment:** Provided as a Docker image for straightforward setup and management using Podman or Docker.
 
 ## Deployment
@@ -229,3 +230,6 @@ All aspects of the slideshow automation are configured via environment variables
 | `NTFY_URL`               | The base URL of your ntfy.sh server (e.g., `https://ntfy.sh` or your self-hosted instance). Notifications are only sent if both `NTFY_URL` and `NTFY_TOPIC` are set. | (None)          |
 | `NTFY_TOPIC`             | The ntfy topic name to publish notifications to.                                                        | (None)          |
 | `NTFY_TOKEN`             | Optional authentication token for your ntfy server.                                                     | (None)          |
+| `ENABLE_TIMER`           | Set to `true` to enable a countdown timer overlay during the final minutes of the video.                | `false`         |
+| `TIMER_MINUTES`          | Number of minutes before the end of the video to start the countdown.                                   | `5`             |
+| `TIMER_POSITION`         | Position of the timer: `top-middle`, `bottom-right`, etc.                                               | `top-middle`    |

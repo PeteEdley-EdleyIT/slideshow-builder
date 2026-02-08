@@ -12,7 +12,7 @@ This project provides a robust, containerized solution for generating engaging v
 *   **Smart Image Ordering:** Ensures your content flows logically.
 *   **Nextcloud Integration:** Effortlessly syncs with your Nextcloud instance for media management.
 *   **Interactive Matrix Bot:** Receive notifications, trigger builds, and check detailed status metrics directly from your Matrix chat room.
-*   **Built-in Health Checks:** Support for Podman native healthchecks and external alerting via ntfy.sh.
+*   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
 *   **Containerized Deployment:** Easy to deploy and manage using Podman or Docker.
 
 ## Get Started:

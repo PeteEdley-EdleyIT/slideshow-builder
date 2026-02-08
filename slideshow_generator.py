@@ -10,8 +10,9 @@ video clip to be appended to the slideshow.
 import os
 import math
 import numpy as np
-from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip
+from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, CompositeVideoClip
 from video_utils import resize_image
+from overlay_manager import TimerOverlay
 
 class SlideshowGenerator:
     """
@@ -114,3 +115,44 @@ class SlideshowGenerator:
         except Exception as e:
             print(f"Error loading append video '{video_path}': {e}")
             return None
+    def apply_timer_overlay(self, video_clip, start_time_offset, total_duration, position='top-middle'):
+        """
+        Applies a countdown timer overlay to a video clip starting at a specific time.
+        
+        Args:
+            video_clip (VideoClip): The clip to overlay the timer on.
+            start_time_offset (float): The time (in seconds) within the clip when the timer starts.
+            total_duration (float): The total duration of the entire video (for countdown calculation).
+            position (str): Timer position.
+
+        Returns:
+            VideoClip: The clip with the timer overlay.
+        """
+        timer = TimerOverlay(target_size=self.target_size)
+        timer_clips = []
+        
+        # Calculate how long the timer should run on this clip
+        overlay_duration = video_clip.duration - start_time_offset
+        
+        # Step through the overlay period in 1-second chunks
+        for t in range(int(overlay_duration)):
+            current_time_in_video = start_time_offset + t
+            remaining = total_duration - current_time_in_video
+            
+            if remaining < 0:
+                break
+                
+            t_clip = timer.create_countdown_clip(
+                remaining_seconds=remaining,
+                duration=1,
+                position=position
+            ).set_start(current_time_in_video)
+            
+            timer_clips.append(t_clip)
+            
+        if not timer_clips:
+            return video_clip
+            
+        # Ensure the background clip is explicitly set to avoid inheritance issues
+        from moviepy.editor import CompositeVideoClip
+        return CompositeVideoClip([video_clip] + timer_clips).set_duration(video_clip.duration)

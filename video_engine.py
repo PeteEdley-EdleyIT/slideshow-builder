@@ -109,6 +109,18 @@ class VideoEngine:
             # 5. Final Composition
             final_video = self._compose_final(slideshow_video, append_video_clip, fps)
             
+            # Apply Timer Overlay if enabled
+            if self.config.enable_timer:
+                timer_start_at = max(0, final_video.duration - (self.config.timer_minutes * 60))
+                print(f"Timer enabled: Overlaying countdown starting at {timer_start_at}s (last {self.config.timer_minutes} mins)")
+                
+                final_video = self.generator.apply_timer_overlay(
+                    final_video, 
+                    start_time_offset=timer_start_at, 
+                    total_duration=final_video.duration,
+                    position=self.config.timer_position
+                )
+            
             if status_callback:
                 await status_callback("✅ Video processing and composition complete. Starting to encode and write to disk...", "processed")
 

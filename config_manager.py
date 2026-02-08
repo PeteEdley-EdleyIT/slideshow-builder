@@ -111,3 +111,8 @@ class Config:
         # Scheduling & Health
         self.cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5")
         self.enable_heartbeat = get_env_bool("ENABLE_HEARTBEAT", True)
+        
+        # Timer Overlay Configuration
+        self.enable_timer = get_env_bool("ENABLE_TIMER", False)
+        self.timer_minutes = get_env_int("TIMER_MINUTES", 5)
+        self.timer_position = get_env_var("TIMER_POSITION", "auto")

@@ -7,6 +7,9 @@ Here are a list of required features to work through one by one we will not be m
 # Development enviroment
 The development enviroment will be a nixos machine and we will developing in python, using gemini-cli.  The development enviroment will be set up using via a nix flake and all project dependancies will be managed by the flake instead of somthing like pip and a venv.
 
+# Coding Standards
+We will be following the PEP 8 style guide for python code. we will always apply DRY and KISS principles to our code. All code will be commented to industry standards. All code will be written in a modular and object oriented fashion. All code will be written in a way that is easy to test and maintain.
+
 ## Local Execution
 To run the script locally for testing:
 1. Ensure your environment is set up (either via `nix develop` or by sourcing the `.venv`).
@@ -72,12 +75,12 @@ podman rm notices-automation
 1.  **Tag the image (latest and versioned):**
     ```bash
     podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.2.4-dev
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.3.0
     ```
 2.  **Push the image:**
     ```bash
     podman push docker.io/pedley/slideshow-builder:latest
-    podman push docker.io/pedley/slideshow-builder:2.2.4-dev
+    podman push docker.io/pedley/slideshow-builder:2.3.0
     ```
 
 # Features
@@ -97,6 +100,7 @@ podman rm notices-automation
 - [x] Notification System: Send success/failure messages to a Matrix chat room, including the list of slides or error details.
 - [x] Interactive Matrix Bot: Switched from Cron to APScheduler, integrated `matrix-nio` for notifications and interactive commands (`!rebuild`, `!status`, `!help`).
 - [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
+- [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).

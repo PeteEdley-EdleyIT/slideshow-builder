@@ -46,6 +46,15 @@
           '';
         };
 
+        extraFiles = pkgs.runCommand "extra-files" { } ''
+          mkdir -p $out/tmp
+          mkdir -p $out/var/run
+          mkdir -p $out/var/log
+          mkdir -p $out/etc/crontabs
+          echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
+          echo "root:x:0:" > $out/etc/group
+        '';
+
         rootContents = pkgs.buildEnv {
           name = "root-contents";
           paths = [
@@ -56,18 +65,12 @@
             pkgs.gnugrep
             pkgs.gnused
             pkgs.findutils
+            pkgs.imagemagick
+            pkgs.dejavu_fonts
+            pkgs.fontconfig
             appDir
+            extraFiles
           ];
-          postBuild = ''
-            mkdir -p $out/tmp
-            mkdir -p $out/var/run
-            mkdir -p $out/var/log
-            mkdir -p $out/etc/crontabs
-            # Add a basic /etc/passwd for root if needed, though cron usually wants it
-            mkdir -p $out/etc
-            echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
-            echo "root:x:0:" > $out/etc/group
-          '';
         };
 
       in
@@ -78,6 +81,9 @@
             pkgs.python311Packages.venvShellHook # Keep for local dev convenience
             pkgs.git
             pkgs.ffmpeg
+            pkgs.imagemagick
+            pkgs.dejavu_fonts
+            pkgs.fontconfig
             pythonEnv # Use the defined python environment
           ];
           venvDir = ".venv";
@@ -108,10 +114,15 @@
                   pkgs.gnugrep
                   pkgs.gnused
                   pkgs.findutils
+                  pkgs.imagemagick
+                  pkgs.dejavu_fonts
+                  pkgs.fontconfig
                 ]
               }"
               "PYTHONPATH=/app"
               "PYTHONUNBUFFERED=1"
+              "FONTCONFIG_FILE=${pkgs.fontconfig.out}/etc/fonts/fonts.conf"
+              "FONTCONFIG_PATH=${pkgs.fontconfig.out}/etc/fonts"
             ];
             Healthcheck = {
               # Checks if the heartbeat file was updated in the last 2 minutes
