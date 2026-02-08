@@ -16,7 +16,10 @@ To run the script locally for testing:
    ```
 
 # Deployment
-Final deployment is via a container image, built using Nix. The script runs via a cron job within the container. Configuration is managed via environment variables, which should be set in a `.env` file.
+Final deployment is via a container image, built using Nix. The script runs as a long-running daemon with internal scheduling. Configuration is managed via environment variables in a `.env` file.
+
+> [!TIP]
+> **Networking Tip**: If running health alerts (ntfy) on the same host as the container, use `NTFY_URL=http://host.containers.internal:8000` in your `.env` to allow the container to reach the host service reliably.
 
 ## Building the Image
 To build the container image using Nix, run the following command from the project root:
