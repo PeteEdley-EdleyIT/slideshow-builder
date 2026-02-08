@@ -45,12 +45,13 @@ class VideoEngine:
         self.generator = SlideshowGenerator(target_size)
         self.audio_mgr = AudioManager(nextcloud_client)
 
-    def create_slideshow(self, output_filepath):
+    async def create_slideshow(self, output_filepath, status_callback=None):
         """
         Executes the full slideshow generation workflow.
 
         Args:
             output_filepath (str): Local path where the final video file will be saved.
+            status_callback (callable, optional): Async function(message, stage) for progress updates.
 
         Returns:
             list: A list of basenames of the images included in the slideshow.
@@ -107,12 +108,21 @@ class VideoEngine:
 
             # 5. Final Composition
             final_video = self._compose_final(slideshow_video, append_video_clip, fps)
+            
+            if status_callback:
+                await status_callback("✅ Video processing and composition complete. Starting to encode and write to disk...", "processed")
 
             # 6. Export and Upload
             self.write_video_manually(final_video, output_filepath, fps)
             
+            if status_callback:
+                filename = os.path.basename(output_filepath)
+                await status_callback(f"💾 Video file successfully written to local storage: `{filename}`", "written")
+            
             if self.nc_client and self.config.nc_upload_path:
                 self.nc_client.upload_file(output_filepath, self.config.nc_upload_path)
+                if status_callback:
+                    await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.nc_upload_path}`", "uploaded")
                 
             return included_slides
 

@@ -82,21 +82,30 @@ async def run_automation(matrix=None):
         if not output_path:
             raise ValueError("No output path specified and no Nextcloud upload path configured.")
 
-        # 2. Run Engine
+        # 2. Run Engine with status reporting
         engine = VideoEngine(config, client)
-        included_slides = engine.create_slideshow(output_path)
         
-        # 3. Success Reporting
+        async def status_reporter(msg, stage):
+            """Internal helper to notify Matrix and ntfy for each major step."""
+            if matrix.is_configured():
+                await matrix.send_message(msg)
+            # Use specific tags for ntfy updates
+            health_mgr.send_ntfy(msg, title=f"Update: {stage}", tags=["information_source"])
+
+        included_slides = await engine.create_slideshow(output_path, status_callback=status_reporter)
+        
+        # 3. Final Success Reporting (Summary)
         health_mgr.mark_success()
         
         if matrix.is_configured():
             video_name = config.nc_upload_path or os.path.basename(output_path)
+            # send_success already includes the slide list, so it's a good final summary
             await matrix.send_success(video_name, included_slides)
             
         health_mgr.send_ntfy(
-            f"Slideshow produced successfully with {len(included_slides)} slides.",
-            title="Slideshow Complete",
-            tags=["white_check_mark", "movie_camera"]
+            f"Slideshow production flow complete. {len(included_slides)} slides processed.",
+            title="Production Complete",
+            tags=["trophy"]
         )
 
     except Exception as e:
