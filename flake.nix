@@ -55,6 +55,7 @@
             pkgs.coreutils
             pkgs.gnugrep
             pkgs.gnused
+            pkgs.findutils
             appDir
           ];
           postBuild = ''
@@ -106,11 +107,20 @@
                   pkgs.coreutils
                   pkgs.gnugrep
                   pkgs.gnused
+                  pkgs.findutils
                 ]
               }"
               "PYTHONPATH=/app"
               "PYTHONUNBUFFERED=1"
             ];
+            Healthcheck = {
+              # Checks if the heartbeat file was updated in the last 2 minutes
+              # Note: HEARTBEAT_FILE is defined as /tmp/heartbeat in create_slideshow.py
+              Test = [ "CMD-SHELL" "find /tmp/heartbeat -mmin -2" ];
+              Interval = 60000000000; # 60s in nanoseconds
+              StartPeriod = 30000000000; # 30s in nanoseconds
+              Retries = 3;
+            };
           };
         };
       }

@@ -18,6 +18,9 @@ import shutil
 import tempfile
 import traceback
 import random
+import time
+from datetime import datetime
+import requests
 from PIL import Image
 
 from video_utils import make_silent_audio, patch_moviepy
@@ -55,8 +58,16 @@ from apscheduler.triggers.cron import CronTrigger
 load_dotenv()
 
 # --- Global Constants ---
+VERSION = "2.1-debug"
 FPS = 5  # Frames per second for the output video
 TARGET_SIZE = (1920, 1080)  # Target resolution for all images and videos
+HEARTBEAT_FILE = "/tmp/heartbeat"
+
+# --- Global Health State ---
+# These are used for the Matrix !status command
+last_success_time = None
+last_heartbeat_time = None
+start_time = time.time()
 
 # --- Background Music Configuration (Default values, overridden by .env) ---
 MUSIC_FOLDER = os.getenv("MUSIC_FOLDER", "images/")
@@ -83,7 +94,7 @@ def get_env_var(name, default=None, required=False):
     if value is not None:
         # Strip potential quotes from environment variable values
         print(f"DEBUG: Internal variable '{name}' raw value: '{value}'")
-        value = value.strip('"').strip("'")
+        value = value.strip().strip('"').strip("'")
     if required and value is None:
         raise ValueError(f"Environment variable '{name}' is required but not set.")
     return value
@@ -120,6 +131,69 @@ def get_env_bool(name, default=False):
         bool: The boolean value of the environment variable, or the default.
     """
     return get_env_var(name, str(default)).lower() == "true"
+
+
+async def write_heartbeat():
+    """
+    Updates the heartbeat file to indicate the process is alive.
+    Only called if ENABLE_HEARTBEAT is set to true.
+    """
+    global last_heartbeat_time
+    try:
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(time.time()))
+        last_heartbeat_time = time.time()
+        print(f"DEBUG: Heartbeat updated at {datetime.fromtimestamp(last_heartbeat_time).strftime('%Y-%m-%d %H:%M:%S')}")
+    except Exception as e:
+        print(f"ERROR: Failed to write heartbeat: {e}")
+
+
+def send_ntfy(message, title=None, priority="default", tags=None):
+    """
+    Sends a notification to an ntfy.sh topic.
+    Only triggered if NTFY_URL and NTFY_TOPIC are configured.
+
+    Args:
+        message (str): The notification message.
+        title (str, optional): The title of the notification.
+        priority (str, optional): Priority level (min, low, default, high, urgent).
+        tags (list, optional): List of emojis or tags.
+    """
+    ntfy_url = get_env_var("NTFY_URL")
+    ntfy_topic = get_env_var("NTFY_TOPIC")
+    ntfy_token = get_env_var("NTFY_TOKEN")
+    enable_ntfy = get_env_bool("ENABLE_NTFY", True)
+
+    if not enable_ntfy:
+        return
+
+    if not ntfy_url or not ntfy_topic:
+        print("DEBUG: ntfy notification skipped (NTFY_URL or NTFY_TOPIC not configured)")
+        return
+
+    # Ensure URL ends with / and combine with topic
+    base_url = ntfy_url.rstrip("/")
+    if ntfy_topic.startswith("/"):
+        ntfy_topic = ntfy_topic[1:]
+    target_url = f"{base_url}/{ntfy_topic}"
+
+    headers = {}
+    if ntfy_token:
+        headers["Authorization"] = f"Bearer {ntfy_token}"
+    if title:
+        headers["Title"] = title
+    if priority:
+        headers["Priority"] = priority
+    if tags:
+        headers["Tags"] = ",".join(tags)
+
+    try:
+        print(f"DEBUG: Attempting to send ntfy notification to {target_url}...")
+        response = requests.post(target_url, data=message.encode('utf-8'), headers=headers, timeout=10)
+        response.raise_for_status()
+        print(f"DEBUG: ntfy notification sent to {ntfy_topic}")
+    except Exception as e:
+        print(f"ERROR: Failed to send ntfy notification to {target_url}: {e}")
 
 
 def create_slideshow(output_filepath, config, nextcloud_client=None):
@@ -311,6 +385,10 @@ class Config:
         self.matrix_token = get_env_var("MATRIX_ACCESS_TOKEN")
         self.matrix_room = get_env_var("MATRIX_ROOM_ID")
         self.matrix_user_id = get_env_var("MATRIX_USER_ID")
+        self.ntfy_url = get_env_var("NTFY_URL")
+        self.ntfy_topic = get_env_var("NTFY_TOPIC")
+        self.ntfy_token = get_env_var("NTFY_TOKEN")
+        self.enable_ntfy = get_env_bool("ENABLE_NTFY", True)
 
 
 async def run_automation(matrix=None):
@@ -325,6 +403,7 @@ async def run_automation(matrix=None):
         matrix (MatrixClient, optional): An initialized MatrixClient instance.
                                         If None, a new one will be created based on config.
     """
+    global last_success_time
     config = Config()
     created_matrix = False
     # If no MatrixClient is provided, create one based on configuration
@@ -337,6 +416,16 @@ async def run_automation(matrix=None):
 
     try:
         print("Starting scheduled slideshow automation...")
+        print(f"DEBUG: ntfy config: enabled={config.enable_ntfy}, url={config.ntfy_url}, topic={config.ntfy_topic}")
+        
+        # Send ntfy notification that we are starting (immediate feedback)
+        send_ntfy(
+            "Starting slideshow production...",
+            title="🚀 Rebuild Started",
+            priority="low",
+            tags=["running"]
+        )
+
         # Initialize Nextcloud client if credentials are provided
         if config.nc_url and config.nc_user:
             client = NextcloudClient(config.nc_url, config.nc_user, config.nc_pass, verify_ssl=not config.nc_insecure)
@@ -360,7 +449,17 @@ async def run_automation(matrix=None):
             video_name = config.nc_upload_path or os.path.basename(output_path)
             await matrix.send_success(video_name, included_slides)
         
+        last_success_time = time.time()
         print("Scheduled slideshow automation complete.")
+
+        # Send ntfy notification
+        video_name = config.nc_upload_path or os.path.basename(output_path)
+        send_ntfy(
+            f"Slideshow '{video_name}' produced successfully with {len(included_slides)} slides.",
+            title="✅ Slideshow Complete",
+            priority="default",
+            tags=["movie_camera", "white_check_mark"]
+        )
 
     except Exception as e:
         error_msg = str(e)
@@ -369,6 +468,14 @@ async def run_automation(matrix=None):
         # Send failure notification to Matrix if configured
         if matrix.is_configured():
             await matrix.send_failure(error_msg, trace_str)
+        
+        # Send ntfy notification on failure
+        send_ntfy(
+            f"Slideshow production failed: {error_msg}",
+            title="❌ Slideshow Failed",
+            priority="high",
+            tags=["boom", "x"]
+        )
     finally:
         # Clean up Matrix client if it was created by this function
         if created_matrix and matrix and matrix.is_configured():
@@ -400,7 +507,31 @@ async def handle_matrix_message(matrix, room, event):
         # Run the automation in a separate task to avoid blocking the Matrix listener
         asyncio.create_task(run_automation(matrix))
     elif command == "!status":
-        await matrix.send_message("🤖 Slideshow Bot is online and scheduled.")
+        uptime_seconds = int(time.time() - start_time)
+        uptime_str = f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m {uptime_seconds % 60}s"
+        
+        last_success_str = datetime.fromtimestamp(last_success_time).strftime('%Y-%m-%d %H:%M:%S') if last_success_time else "Never"
+        last_heartbeat_str = datetime.fromtimestamp(last_heartbeat_time).strftime('%Y-%m-%d %H:%M:%S') if last_heartbeat_time else "Disabled/Not yet run"
+        
+        status_msg = (
+            "🤖 **Slideshow Bot Status**\n"
+            f"⏱️ **Uptime**: {uptime_str}\n"
+            f"✅ **Last Success**: {last_success_str}\n"
+            f"💓 **Last Heartbeat**: {last_heartbeat_str}\n"
+        )
+        
+        # Optional: check Nextcloud connectivity if configured
+        config = Config()
+        if config.nc_url and config.nc_user:
+            try:
+                from nextcloud_client import NextcloudClient
+                # Just a quick check (not a full login if too heavy, but here we can afford it)
+                nc = NextcloudClient(config.nc_url, config.nc_user, config.nc_pass, verify_ssl=not config.nc_insecure)
+                status_msg += "☁️ **Nextcloud**: Connected\n"
+            except Exception:
+                status_msg += "☁️ **Nextcloud**: ❌ Connection Failed\n"
+        
+        await matrix.send_message(status_msg)
     elif command == "!help":
         help_text = (
             "Available commands:\n"
@@ -420,6 +551,8 @@ async def main():
     for interactive commands.
     """
     config = Config()
+    print(f"--- BOT VERSION {VERSION} STARTING ---")
+    print(f"DEBUG: Config loaded successfully. ntfy_enabled={config.enable_ntfy}, ntfy_url={config.ntfy_url}")
     cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5") # Default to Friday 1:00 AM
     
     # Initialize Matrix client
@@ -439,6 +572,13 @@ async def main():
         print("Falling back to default Friday 1:00 AM schedule.")
         # Fallback to a default schedule if the configured one is invalid
         scheduler.add_job(run_automation, CronTrigger.from_crontab("0 1 * * 5"), args=[matrix], id="slideshow_job")
+
+    # Optional Heartbeat Job
+    if get_env_bool("ENABLE_HEARTBEAT", False):
+        print("Enabling heartbeat mechanism...")
+        scheduler.add_job(write_heartbeat, 'interval', minutes=1, id="heartbeat_job")
+        # Run once immediately
+        asyncio.create_task(write_heartbeat())
 
     scheduler.start() # Start the APScheduler
 

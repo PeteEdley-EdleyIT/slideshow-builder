@@ -11,7 +11,8 @@ This project provides a robust, containerized solution for generating engaging v
 *   **Customizable Output:** Control image display duration, total video length, and append additional video content.
 *   **Smart Image Ordering:** Ensures your content flows logically.
 *   **Nextcloud Integration:** Effortlessly syncs with your Nextcloud instance for media management.
-*   **Interactive Matrix Bot:** Receive notifications, trigger builds, and check status directly from your Matrix chat room.
+*   **Interactive Matrix Bot:** Receive notifications, trigger builds, and check detailed status metrics directly from your Matrix chat room.
+*   **Built-in Health Checks:** Support for Podman native healthchecks and external alerting via ntfy.sh.
 *   **Containerized Deployment:** Easy to deploy and manage using Podman or Docker.
 
 ## Get Started:
@@ -55,4 +56,15 @@ To quickly get the automation running, follow these steps. For full details on c
     docker-compose up -d
     ```
 
-For detailed configuration options, Matrix bot commands, and advanced deployment scenarios, please see the [full README.md](Link to your GitHub README.md here).
+3.  **Configure Monitoring (Optional):**
+    Enable native healthchecks and external alerts by adding these to your `.env`:
+    ```bash
+    # Enable Podman/Docker healthchecks
+    ENABLE_HEARTBEAT=true
+
+    # Enable ntfy.sh alerts
+    NTFY_URL=https://ntfy.sh
+    NTFY_TOPIC=your_secret_topic
+    ```
+
+For detailed configuration options, Matrix bot commands, and advanced deployment scenarios, please see the [full README.md](https://github.com/pedley/Notices-Video-Production).
