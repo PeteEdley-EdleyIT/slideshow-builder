@@ -181,7 +181,14 @@ def send_ntfy(message, title=None, priority="default", tags=None):
     if ntfy_token:
         headers["Authorization"] = f"Bearer {ntfy_token}"
     if title:
-        headers["Title"] = title
+        # HTTP headers must be ISO-8859-1. We encode to UTF-8 then decode to latin-1 
+        # to ensure the bytes are passed through, though some clients might not 
+        # decode this correctly. ntfy handles this if you use the X-Title header 
+        # but for simplicity we'll just ensure it's a valid string.
+        try:
+            headers["Title"] = title.encode('utf-8').decode('iso-8859-1')
+        except UnicodeError:
+            headers["Title"] = title.encode('ascii', 'replace').decode('ascii')
     if priority:
         headers["Priority"] = priority
     if tags:
@@ -189,6 +196,7 @@ def send_ntfy(message, title=None, priority="default", tags=None):
 
     try:
         print(f"DEBUG: Attempting to send ntfy notification to {target_url}...")
+        # Use UTF-8 for the body, which is supported by ntfy
         response = requests.post(target_url, data=message.encode('utf-8'), headers=headers, timeout=10)
         response.raise_for_status()
         print(f"DEBUG: ntfy notification sent to {ntfy_topic}")
@@ -421,9 +429,9 @@ async def run_automation(matrix=None):
         # Send ntfy notification that we are starting (immediate feedback)
         send_ntfy(
             "Starting slideshow production...",
-            title="🚀 Rebuild Started",
+            title="Rebuild Started",
             priority="low",
-            tags=["running"]
+            tags=["rocket", "running"]
         )
 
         # Initialize Nextcloud client if credentials are provided
@@ -456,9 +464,9 @@ async def run_automation(matrix=None):
         video_name = config.nc_upload_path or os.path.basename(output_path)
         send_ntfy(
             f"Slideshow '{video_name}' produced successfully with {len(included_slides)} slides.",
-            title="✅ Slideshow Complete",
+            title="Slideshow Complete",
             priority="default",
-            tags=["movie_camera", "white_check_mark"]
+            tags=["white_check_mark", "movie_camera"]
         )
 
     except Exception as e:
@@ -472,9 +480,9 @@ async def run_automation(matrix=None):
         # Send ntfy notification on failure
         send_ntfy(
             f"Slideshow production failed: {error_msg}",
-            title="❌ Slideshow Failed",
+            title="Slideshow Failed",
             priority="high",
-            tags=["boom", "x"]
+            tags=["x", "boom"]
         )
     finally:
         # Clean up Matrix client if it was created by this function
