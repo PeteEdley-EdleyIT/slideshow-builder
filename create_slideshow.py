@@ -258,11 +258,13 @@ def create_slideshow(output_filepath, config, nextcloud_client=None):
                 if temp_vid_dir:
                     temp_dirs.append(temp_vid_dir) # Add temp dir to cleanup list
             
-            # Load and prepare the append video
-            append_video_clip = generator.load_append_video(local_video_path, fps)
+            # Load and prepare the append video (preserving native FPS for detection)
+            append_video_clip = generator.load_append_video(local_video_path)
             if append_video_clip and append_video_clip.fps:
-                # Adjust FPS based on appended video if it has a valid FPS
+                # Adjust project FPS based on appended video
                 fps = round(max(5, min(30, append_video_clip.fps)), 2)
+                # Now explicitly set the clip's FPS to our rounded target
+                append_video_clip.fps = fps
 
         # 3. Calculate Durations
         slideshow_target_duration = config.target_video_duration

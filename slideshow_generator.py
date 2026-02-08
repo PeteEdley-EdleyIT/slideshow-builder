@@ -88,16 +88,12 @@ class SlideshowGenerator:
         
         return slideshow_video
 
-    def load_append_video(self, video_path, target_fps):
+    def load_append_video(self, video_path):
         """
         Loads and prepares a video clip to be appended to the slideshow.
 
         The video is resized to the `target_size` if necessary and its
         FPS is set to `target_fps`.
-
-        Args:
-            video_path (str): The file path to the video to be loaded.
-            target_fps (int): The desired frames per second for the video clip.
 
         Returns:
             VideoFileClip: A MoviePy VideoFileClip object representing the
@@ -114,7 +110,6 @@ class SlideshowGenerator:
                 print(f"Resizing append video from {clip.size} to {self.target_size}")
                 clip = clip.resize(self.target_size)
             
-            clip.fps = target_fps
             return clip
         except Exception as e:
             print(f"Error loading append video '{video_path}': {e}")

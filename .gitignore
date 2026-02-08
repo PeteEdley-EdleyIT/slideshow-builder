@@ -22,3 +22,4 @@ images/
 # Environment variables
 .env
 matrix_store/
+MONITORING_OPTIONS.md
