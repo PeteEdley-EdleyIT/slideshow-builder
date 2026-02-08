@@ -12,7 +12,7 @@ import requests
 import xml.etree.ElementTree as ET
 import tempfile
 import shutil
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 def sort_key(filepath):
     """
@@ -143,7 +143,9 @@ class NextcloudClient:
 
                 # Construct the full download URL and local path
                 download_url = f"{self.base_url}{file_href.lstrip('/')}"
-                local_filename = os.path.join(temp_dir, os.path.basename(file_href))
+                # Decode the filename (e.g., %20 -> space) for local storage and reporting
+                filename_unquoted = unquote(os.path.basename(file_href))
+                local_filename = os.path.join(temp_dir, filename_unquoted)
 
                 print(f"Downloading {file_href} to {local_filename}...")
                 download_response = requests.get(download_url, auth=self.auth, verify=self.verify_ssl, stream=True)
@@ -182,7 +184,9 @@ class NextcloudClient:
         """
         download_url = self._get_webdav_url(remote_path)
         temp_dir = tempfile.mkdtemp()
-        local_filename = os.path.join(temp_dir, os.path.basename(remote_path))
+        # Decode the filename (e.g., %20 -> space) for local storage
+        filename_unquoted = unquote(os.path.basename(remote_path))
+        local_filename = os.path.join(temp_dir, filename_unquoted)
 
         print(f"Downloading {remote_path} from Nextcloud to {local_filename}...")
         try:
