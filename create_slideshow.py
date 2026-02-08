@@ -58,7 +58,6 @@ from apscheduler.triggers.cron import CronTrigger
 load_dotenv()
 
 # --- Global Constants ---
-VERSION = "2.1-debug"
 FPS = 5  # Frames per second for the output video
 TARGET_SIZE = (1920, 1080)  # Target resolution for all images and videos
 HEARTBEAT_FILE = "/tmp/heartbeat"
@@ -93,7 +92,6 @@ def get_env_var(name, default=None, required=False):
     value = os.getenv(name, default)
     if value is not None:
         # Strip potential quotes from environment variable values
-        print(f"DEBUG: Internal variable '{name}' raw value: '{value}'")
         value = value.strip().strip('"').strip("'")
     if required and value is None:
         raise ValueError(f"Environment variable '{name}' is required but not set.")
@@ -143,7 +141,6 @@ async def write_heartbeat():
         with open(HEARTBEAT_FILE, "w") as f:
             f.write(str(time.time()))
         last_heartbeat_time = time.time()
-        print(f"DEBUG: Heartbeat updated at {datetime.fromtimestamp(last_heartbeat_time).strftime('%Y-%m-%d %H:%M:%S')}")
     except Exception as e:
         print(f"ERROR: Failed to write heartbeat: {e}")
 
@@ -168,7 +165,6 @@ def send_ntfy(message, title=None, priority="default", tags=None):
         return
 
     if not ntfy_url or not ntfy_topic:
-        print("DEBUG: ntfy notification skipped (NTFY_URL or NTFY_TOPIC not configured)")
         return
 
     # Ensure URL ends with / and combine with topic
@@ -195,11 +191,9 @@ def send_ntfy(message, title=None, priority="default", tags=None):
         headers["Tags"] = ",".join(tags)
 
     try:
-        print(f"DEBUG: Attempting to send ntfy notification to {target_url}...")
         # Use UTF-8 for the body, which is supported by ntfy
         response = requests.post(target_url, data=message.encode('utf-8'), headers=headers, timeout=10)
         response.raise_for_status()
-        print(f"DEBUG: ntfy notification sent to {ntfy_topic}")
     except Exception as e:
         print(f"ERROR: Failed to send ntfy notification to {target_url}: {e}")
 
@@ -424,7 +418,6 @@ async def run_automation(matrix=None):
 
     try:
         print("Starting scheduled slideshow automation...")
-        print(f"DEBUG: ntfy config: enabled={config.enable_ntfy}, url={config.ntfy_url}, topic={config.ntfy_topic}")
         
         # Send ntfy notification that we are starting (immediate feedback)
         send_ntfy(
@@ -506,7 +499,7 @@ async def handle_matrix_message(matrix, room, event):
         event (nio.events.room_events.RoomMessageText): The message event.
     """
     command = event.body.strip()
-    print(f"DEBUG: Processing command: '{command}' from {event.sender}")
+    print(f"Processing command: '{command}' from {event.sender}")
     
     # In a production scenario, you might want to add sender verification
     # (e.g., only allow specific user IDs to trigger commands)
@@ -559,8 +552,6 @@ async def main():
     for interactive commands.
     """
     config = Config()
-    print(f"--- BOT VERSION {VERSION} STARTING ---")
-    print(f"DEBUG: Config loaded successfully. ntfy_enabled={config.enable_ntfy}, ntfy_url={config.ntfy_url}")
     cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5") # Default to Friday 1:00 AM
     
     # Initialize Matrix client

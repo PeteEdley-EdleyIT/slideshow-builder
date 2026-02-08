@@ -218,21 +218,15 @@ class MatrixClient:
             room_id (str): The ID of the room where the message was sent.
             event (nio.events.room_events.RoomMessageText): The incoming message event.
         """
-        print(f"DEBUG: Received event type {type(event).__name__} from {event.sender}")
-        print(f"DEBUG: Comparing sender '{event.sender}' with bot ID '{self.client.user_id}'")
         # Ignore our own messages to prevent infinite loops
         if event.sender == self.client.user_id:
-            print("DEBUG: Ignoring our own message.")
             return
 
-        print(f"DEBUG: Received Matrix event in room {room_id} (Target: {self.room_id}) from {event.sender}: {event.body}")
         # Process messages only from the configured room
         if room_id == self.room_id:
             if self._message_callback:
                 # Call the registered message handler
                 await self._message_callback(room_id, event)
-        else:
-            print(f"DEBUG: Event ignored (wrong room)")
 
     async def listen_forever(self):
         """
