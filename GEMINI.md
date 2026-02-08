@@ -69,13 +69,15 @@ podman rm notices-automation
 ```
 
 ## Pushing to a Registry
-1.  **Tag the image:**
+1.  **Tag the image (latest and versioned):**
     ```bash
     podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.2.4-dev
     ```
 2.  **Push the image:**
     ```bash
     podman push docker.io/pedley/slideshow-builder:latest
+    podman push docker.io/pedley/slideshow-builder:2.2.4-dev
     ```
 
 # Features

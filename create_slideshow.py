@@ -25,6 +25,7 @@ from video_engine import VideoEngine
 from matrix_client import MatrixClient
 from nextcloud_client import NextcloudClient
 from video_utils import patch_moviepy
+from version import __version__
 
 # Initialize Global State
 load_dotenv()
@@ -143,6 +144,7 @@ async def handle_matrix_message(matrix, room, event):
         
         status_msg = (
             "🤖 **Slideshow Bot Status**\n"
+            f"🏷️ **Version**: {__version__}\n"
             f"⏱️ **Uptime**: {stats['uptime']}\n"
             f"✅ **Last Success**: {stats['last_success']}\n"
             f"💓 **Heartbeat Active**: {'Yes' if stats['heartbeat_active'] else 'No'}\n"

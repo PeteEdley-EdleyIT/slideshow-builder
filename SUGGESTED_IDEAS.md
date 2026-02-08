@@ -47,13 +47,3 @@ This document outlines potential enhancements for the Video Slideshow Automation
 10. **Advanced Configuration via Matrix:**
     *   **Description:** Expand the `!config` command to allow viewing and modifying various slideshow parameters (e.g., slide duration, music folder, output resolution) directly through Matrix.
     *   **Benefit:** Centralized control and easier management without needing to access environment variables or files.
-
-## Reliability & Debugging:
-
-11. **Enhanced Error Reporting:**
-    *   **Description:** Provide more detailed error messages, perhaps including stack traces or specific file paths, sent to the Matrix room on failure.
-    *   **Benefit:** Easier debugging and troubleshooting.
-
-12. **Health Checks:**
-    *   **Description:** Implement a simple health check endpoint or periodic self-checks that the bot can report on (e.g., "All services operational").
-    *   **Benefit:** Ensures the bot is running and responsive.
