@@ -22,6 +22,7 @@ This project automatically creates video slideshows from image and music files, 
     *   **ntfy.sh Integration:** Receive instant push notifications for successful builds or critical failures on your self-hosted ntfy server.
     *   **Proactive Status Reporting:** Matrix `!status` command provides detailed metrics (uptime, last success, last heartbeat).
 *   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
+*   **Runtime Configuration Management:** Override configuration settings on-the-fly via Matrix commands (`!set`, `!get`, `!config`, `!defaults`). Changes persist across container restarts.
 *   **Containerized for Easy Deployment:** Provided as a Docker image for straightforward setup and management using Podman or Docker.
 
 ## Deployment
@@ -54,12 +55,14 @@ podman run -d \
   --name notices-automation \
   --restart always \
   --env-file .env \
+  -v notices-data:/data \
   localhost/slideshow-builder:latest
 ```
     *   `-d`: Runs the container in detached mode (in the background).
     *   `--name notices-automation`: Assigns a memorable name to your container.
     *   `--restart always`: Ensures the container automatically restarts if it stops or the system reboots.
     *   `--env-file .env`: Mounts your `.env` file into the container for configuration.
+    *   `-v notices-data:/data`: Creates a persistent volume for runtime configuration changes made via Matrix commands.
     *   `localhost/slideshow-builder:latest`: Specifies the image to run.
 
 #### With Docker
@@ -74,6 +77,7 @@ docker run -d \
   --name notices-automation \
   --restart always \
   --env-file .env \
+  -v notices-data:/data \
   localhost/slideshow-builder:latest
 ```
     The options are the same as for Podman.
@@ -92,10 +96,14 @@ services:
     restart: always
     env_file:
       - .env
-    # If you need to mount local folders for images/music, uncomment and adjust these:
+    volumes:
+      - notices-data:/data
+    # If you need to mount local folders for images/music/output, uncomment and adjust these:
     # volumes:
     #   - ./images:/app/images
     #   - ./music:/app/music
+    #   - ./output:/app/output
+    #   - notices-data:/data  # Keep this for persistent config
 ```
 
 Then, you can manage your service with these commands:
@@ -199,6 +207,11 @@ Your automation bot will send notifications and respond to commands in the Matri
 
 *   **View Bot Status:** Send `!status` in the Matrix chat room to check if the bot is online, view its uptime, and see when the last video was successfully produced.
 *   **Manual Video Generation:** Send `!rebuild` in the Matrix chat room to immediately trigger the video generation process. The bot will notify you when it starts and finishes.
+*   **Runtime Configuration:** 
+    *   `!set KEY VALUE` - Override a configuration setting (e.g., `!set IMAGE_DURATION 15`)
+    *   `!get KEY` - View the current value of a setting
+    *   `!config` - List all active configuration overrides
+    *   `!defaults` - Reset all settings to .env defaults
 *   **Get Help:** Send `!help` in the Matrix chat room to see a list of available commands.
 
 ## Configuration
@@ -209,8 +222,8 @@ All aspects of the slideshow automation are configured via environment variables
 | :----------------------- | :------------------------------------------------------------------------------------------------------ | :-------------- |
 | `IMAGE_DURATION`         | Sets how long (in seconds) each individual image remains on screen in the slideshow.                    | `10`            |
 | `TARGET_VIDEO_DURATION`  | Defines the desired total length of the final video in seconds. The slideshow will repeat to meet this duration. | `600` (`10 min`)| 
-| `IMAGE_FOLDER`           | Specifies the local directory where the automation should look for source image files.                  | `images/`       |
-| `OUTPUT_FILEPATH`        | The full local path, including filename (e.g., `/videos/output.mp4`), where the generated video will be saved. If left empty, and `UPLOAD_NEXTCLOUD_PATH` is set, a temporary file is used for generation. | (None)          |
+| `IMAGE_SOURCE`           | Source of images: `nextcloud` or `local`. Defaults to `nextcloud` if `NEXTCLOUD_IMAGE_PATH` is set. If `local`, mount your folder to `/app/images`.  | (Auto)          |
+| `MUSIC_SOURCE`           | Source of music: `nextcloud` or `local`. Defaults to `nextcloud` if `NEXTCLOUD_IMAGE_PATH` is set. If `local`, mount your folder to `/app/music`.    | (Auto)          |
 | `NEXTCLOUD_URL`          | The base URL of your Nextcloud instance (e.g., `https://your.nextcloud.com`). Required for Nextcloud integration. | (None)          |
 | `NEXTCLOUD_USERNAME`     | Your Nextcloud username for authentication. Required for Nextcloud integration.                         | (None)          |
 | `NEXTCLOUD_PASSWORD`     | Your Nextcloud password for authentication. Required for Nextcloud integration.                         | (None)          |
@@ -219,7 +232,7 @@ All aspects of the slideshow automation are configured via environment variables
 | `NEXTCLOUD_INSECURE_SSL` | Set to `true` if your Nextcloud instance uses a self-signed or invalid SSL certificate and you wish to proceed anyway. Use with extreme caution. | `false`         |
 | `APPEND_VIDEO_PATH`      | The path to an additional video file to be appended after the main slideshow. Can be a local path or a Nextcloud path (if `APPEND_VIDEO_SOURCE` is `nextcloud`). | (None)          |
 | `APPEND_VIDEO_SOURCE`    | Specifies where the `APPEND_VIDEO_PATH` refers to: `local` for a local file, or `nextcloud` for a file on your Nextcloud. | `local`         |
-| `MUSIC_FOLDER`           | The local directory where background music files are stored.                                            | `images/`       |
+| `MUSIC_FOLDER`           | Nextcloud path for background music (e.g., `Uploads/Music`) if `MUSIC_SOURCE` is `nextcloud`. Ignored if `MUSIC_SOURCE` is `local` (uses mounted `/app/music`). | `Uploads/Music` |
 | `MUSIC_SOURCE`           | Specifies where the automation should find background music files: `local` for a local folder, or `nextcloud` for a Nextcloud path. | `local`         |
 | `MATRIX_HOMESERVER`      | The URL of your Matrix homeserver (e.g., `https://matrix.org`). Required for Matrix bot functionality. | (None)          |
 | `MATRIX_ACCESS_TOKEN`    | An access token for your Matrix bot user. This token *must* have sufficient permissions (read/write to the room, send messages). Essential for Matrix bot. | (None)          |

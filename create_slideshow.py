@@ -26,6 +26,7 @@ from matrix_client import MatrixClient
 from nextcloud_client import NextcloudClient
 from video_utils import patch_moviepy
 from version import __version__
+from settings_manager import get_settings_manager
 
 # Initialize Global State
 load_dotenv()
@@ -112,7 +113,7 @@ async def run_automation(matrix=None):
     except Exception as e:
         error_msg = str(e)
         trace_str = traceback.format_exc()
-        print(f"ERROR: {error_msg}\n{trace_str}")
+        print(f"ERROR: {error_msg}\\n{trace_str}")
         
         if matrix.is_configured():
             await matrix.send_failure(error_msg, trace_str)
@@ -134,6 +135,25 @@ async def handle_matrix_message(matrix, room, event):
     """Callback for handling Matrix commands."""
     command = event.body.strip()
     print(f"Processing command: '{command}' from {event.sender}")
+    
+    # List of configurable settings
+    CONFIGURABLE_SETTINGS = [
+        "IMAGE_DURATION",
+        "TARGET_VIDEO_DURATION",
+        "CRON_SCHEDULE",
+        "IMAGE_SOURCE",
+        "MUSIC_SOURCE",
+        "NEXTCLOUD_IMAGE_PATH",
+        "UPLOAD_NEXTCLOUD_PATH",
+        "APPEND_VIDEO_PATH",
+        "APPEND_VIDEO_SOURCE",
+        "ENABLE_HEARTBEAT",
+        "NTFY_TOPIC",
+        "ENABLE_NTFY",
+        "ENABLE_TIMER",
+        "TIMER_MINUTES",
+        "TIMER_POSITION"
+    ]
     
     if command == "!rebuild":
         await matrix.send_message("🚀 Starting manual rebuild...")
@@ -160,13 +180,98 @@ async def handle_matrix_message(matrix, room, event):
                 status_msg += "☁️ **Nextcloud**: ❌ Connection Failed\n"
         
         await matrix.send_message(status_msg)
+    
+    elif command.startswith("!set "):
+        # Parse: !set KEY VALUE
+        parts = command.split(None, 2)
+        if len(parts) < 3:
+            await matrix.send_message("❌ Usage: !set KEY VALUE\nExample: !set IMAGE_DURATION 15")
+            return
+        
+        key = parts[1].upper()
+        value = parts[2]
+        
+        if key not in CONFIGURABLE_SETTINGS:
+            await matrix.send_message(
+                f"❌ '{key}' is not a configurable setting.\n"
+                f"Use !config to see available settings."
+            )
+            return
+        
+        settings = get_settings_manager()
+        settings.set(key, value)
+        await matrix.send_message(f"✅ Set {key} = {value}\n\n⚠️ Changes will take effect on next rebuild.")
+    
+    elif command.startswith("!get "):
+        # Parse: !get KEY
+        parts = command.split(None, 1)
+        if len(parts) < 2:
+            await matrix.send_message("❌ Usage: !get KEY\nExample: !get IMAGE_DURATION")
+            return
+        
+        key = parts[1].upper()
+        
+        if key not in CONFIGURABLE_SETTINGS:
+            await matrix.send_message(f"❌ '{key}' is not a configurable setting.")
+            return
+        
+        config = Config()
+        # Get the actual value being used
+        value = getattr(config, key.lower(), "Not set")
+        
+        settings = get_settings_manager()
+        db_value = settings.get(key)
+        
+        if db_value is not None:
+            msg = f"📝 {key} = {value}\n(Runtime override active)"
+        else:
+            msg = f"📝 {key} = {value}\n(Using .env default)"
+        
+        await matrix.send_message(msg)
+    
+    elif command == "!config":
+        # List all current configuration overrides
+        settings = get_settings_manager()
+        overrides = settings.list_all()
+        
+        if not overrides:
+            msg = "📋 **Current Configuration**\n\nNo runtime overrides active.\nAll settings are using .env defaults.\n\nUse !set KEY VALUE to override a setting."
+        else:
+            override_list = "\n".join([f"• {k} = {v}" for k, v in overrides.items()])
+            msg = f"📋 **Current Configuration Overrides**\n\n{override_list}\n\nUse !defaults to reset all to .env values."
+        
+        await matrix.send_message(msg)
+    
+    elif command == "!defaults":
+        # Reset all settings to .env defaults
+        settings = get_settings_manager()
+        count = settings.reset_all()
+        original_message = (
+            f"♻️ Reset {count} configuration override(s).\n"
+            f"All settings now use .env defaults.\n\n"
+            f"⚠️ Changes will take effect on next rebuild."
+        )
+        await matrix.send_message(original_message)
         
     elif command == "!help":
         help_text = (
-            "Available commands:\n"
-            "!rebuild - Trigger a manual video generation\n"
-            "!status - Check the bot's health and uptime\n"
-            "!help - Show this message"
+            "**Available Commands:**\n\n"
+            "**Automation:**\n"
+            "• !rebuild - Trigger a manual video generation\n"
+            "• !status - Check the bot's health and uptime\n\n"
+            "**Configuration:**\n"
+            "• !set KEY VALUE - Override a configuration setting\n"
+            "• !get KEY - View current value of a setting\n"
+            "• !config - List all active configuration overrides\n"
+            "• !defaults - Reset all settings to .env defaults\n\n"
+            "• !help - Show this message\n\n"
+            "**Configurable Settings:**\n"
+            "IMAGE_DURATION, TARGET_VIDEO_DURATION, CRON_SCHEDULE,\n"
+            "IMAGE_SOURCE, MUSIC_SOURCE,\n"
+            "NEXTCLOUD_IMAGE_PATH, UPLOAD_NEXTCLOUD_PATH,\n"
+            "APPEND_VIDEO_PATH, APPEND_VIDEO_SOURCE,\n"
+            "ENABLE_HEARTBEAT, NTFY_TOPIC, ENABLE_NTFY,\n"
+            "ENABLE_TIMER, TIMER_MINUTES, TIMER_POSITION"
         )
         await matrix.send_message(help_text)
 

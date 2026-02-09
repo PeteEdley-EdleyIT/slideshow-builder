@@ -3,33 +3,47 @@ Configuration management for the Video Slideshow Automation.
 
 This module provides utility functions for retrieving environment variables
 with proper stripping and type conversion, and a `Config` class to centralize
-all application settings.
+all application settings. Configuration values can be overridden at runtime
+via the settings database.
 """
 
 import os
+from settings_manager import get_settings_manager
 
 def get_env_var(name, default=None, required=False):
     """
-    Retrieves an environment variable, strips quotes, and handles default values.
+    Retrieves a configuration value, checking the database first, then environment variables.
+    
+    This function enables runtime configuration changes via Matrix commands.
+    Priority: Database override > Environment variable > Default value
 
     Args:
-        name (str): The name of the environment variable.
+        name (str): The name of the configuration variable.
         default (str, optional): The default value if the variable is not set. Defaults to None.
         required (bool, optional): If True, raises a ValueError if the variable is not set
                                    and no default is provided. Defaults to False.
 
     Returns:
-        str: The value of the environment variable, or the default value.
+        str: The value of the configuration variable, or the default value.
 
     Raises:
         ValueError: If `required` is True and the variable is not set.
     """
-    value = os.getenv(name, default)
+    # Check database first for runtime overrides
+    settings = get_settings_manager()
+    db_value = settings.get(name)
+    
+    if db_value is not None:
+        value = db_value
+    else:
+        # Fall back to environment variable
+        value = os.getenv(name, default)
+    
     if value is not None:
         # Strip potential quotes from environment variable values
         value = value.strip().strip('"').strip("'")
     if required and value is None:
-        raise ValueError(f"Environment variable '{name}' is required but not set.")
+        raise ValueError(f"Configuration variable '{name}' is required but not set.")
     return value
 
 
@@ -72,6 +86,13 @@ class Config:
 
     This class centralizes access to all configurable parameters, providing
     default values where necessary and type conversion (e.g., to int or bool).
+    
+    For local file operations, paths are hardcoded to standard container locations:
+    - Images: /app/images
+    - Output: /app/output
+    - Music: /app/music
+    
+    Users mount volumes to these paths and use SOURCE variables to select local vs Nextcloud.
     """
     def __init__(self):
         """
@@ -80,8 +101,13 @@ class Config:
         # Slideshow Settings
         self.image_duration = get_env_int("IMAGE_DURATION", 10)
         self.target_video_duration = get_env_int("TARGET_VIDEO_DURATION", 600)
-        self.image_folder = get_env_var("IMAGE_FOLDER", "images/")
-        self.output_filepath = get_env_var("OUTPUT_FILEPATH")
+        
+        # Hardcoded container paths for local files
+        self.image_folder = "/app/images"
+        self.output_folder = "/app/output"
+        # Default to container path, but allow override (e.g. for Nextcloud path)
+        self.music_folder = get_env_var("MUSIC_FOLDER", "/app/music")
+        self.output_filepath = "/app/output/slideshow.mp4"
         
         # Nextcloud Configuration
         self.nc_url = get_env_var("NEXTCLOUD_URL")
@@ -91,9 +117,14 @@ class Config:
         self.nc_upload_path = get_env_var("UPLOAD_NEXTCLOUD_PATH")
         self.nc_insecure = get_env_bool("NEXTCLOUD_INSECURE_SSL", False)
         
+        # Source Selection (auto-detect based on Nextcloud config, or use explicit setting)
+        # If NEXTCLOUD_IMAGE_PATH is set, default to nextcloud, otherwise local
+        self.image_source = get_env_var("IMAGE_SOURCE", "nextcloud" if self.nc_image_path else "local")
+        self.music_source = get_env_var("MUSIC_SOURCE", "nextcloud" if self.nc_image_path else "local")
+        
         # Append Video Configuration
         self.append_video_path = get_env_var("APPEND_VIDEO_PATH")
-        self.append_video_source = get_env_var("APPEND_VIDEO_SOURCE", "local")
+        self.append_video_source = get_env_var("APPEND_VIDEO_SOURCE", "nextcloud" if self.append_video_path and self.nc_url else "local")
         
         # Matrix Bot Configuration
         self.matrix_homeserver = get_env_var("MATRIX_HOMESERVER")

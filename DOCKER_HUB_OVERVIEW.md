@@ -12,6 +12,7 @@ This project provides a robust, containerized solution for generating engaging v
 *   **Smart Image Ordering:** Ensures your content flows logically.
 *   **Nextcloud Integration:** Effortlessly syncs with your Nextcloud instance for media management.
 *   **Interactive Matrix Bot:** Receive notifications, trigger builds, and check detailed status metrics directly from your Matrix chat room.
+*   **Runtime Configuration Management:** Override configuration settings on-the-fly via Matrix commands. Changes persist across container restarts.
 *   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
 *   **Containerized Deployment:** Easy to deploy and manage using Podman or Docker.
 
@@ -27,13 +28,13 @@ To quickly get the automation running, follow these steps. For full details on c
     **With Podman:**
     ```bash
     podman pull pedley/slideshow-builder:latest
-    podman run -d --name notices-automation --restart always --env-file .env pedley/slideshow-builder:latest
+    podman run -d --name notices-automation --restart always --env-file .env -v notices-data:/data pedley/slideshow-builder:latest
     ```
 
     **With Docker:**
     ```bash
     docker pull pedley/slideshow-builder:latest
-    docker run -d --name notices-automation --restart always --env-file .env pedley/slideshow-builder:latest
+    docker run -d --name notices-automation --restart always --env-file .env -v notices-data:/data pedley/slideshow-builder:latest
     ```
 
     **Using Docker Compose (Recommended for Docker Users):**
@@ -47,9 +48,12 @@ To quickly get the automation running, follow these steps. For full details on c
         restart: always
         env_file:
           - .env
-        # volumes:
+        volumes:
+          - notices-data:/data
+        # Optionally mount local folders:
         #   - ./images:/app/images
         #   - ./music:/app/music
+        #   - ./output:/app/output
     ```
     Then run:
     ```bash

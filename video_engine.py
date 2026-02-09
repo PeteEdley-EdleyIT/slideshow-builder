@@ -94,11 +94,8 @@ class VideoEngine:
                     image_paths, self.config.image_duration, slideshow_target_duration, fps
                 )
                 
-                audio_folder = os.getenv("MUSIC_FOLDER", self.config.image_folder)
-                audio_source = os.getenv("MUSIC_SOURCE", "local")
-                
                 slideshow_audio = self.audio_mgr.prepare_background_music(
-                    audio_folder, audio_source, slideshow_target_duration, temp_dirs
+                    self.config.music_folder, self.config.music_source, slideshow_target_duration, temp_dirs
                 )
                 
                 if not slideshow_audio:
@@ -147,7 +144,7 @@ class VideoEngine:
 
     def _source_images(self, temp_dirs):
         """Internal helper to retrieve image paths from local or Nextcloud."""
-        if self.nc_client and self.config.nc_image_path:
+        if self.config.image_source == "nextcloud" and self.nc_client and self.config.nc_image_path:
             print("Retrieving images from Nextcloud...")
             image_paths, temp_img_dir = self.nc_client.list_and_download_files(
                 self.config.nc_image_path, allowed_extensions=('.jpg', '.jpeg')
@@ -156,6 +153,7 @@ class VideoEngine:
                 temp_dirs.append(temp_img_dir)
             return image_paths
         else:
+            print(f"Retrieving images from local folder: {self.config.image_folder}")
             image_paths = glob.glob(os.path.join(self.config.image_folder, "*.jpg"))
             image_paths.extend(glob.glob(os.path.join(self.config.image_folder, "*.jpeg")))
             image_paths.sort(key=sort_key)

@@ -42,8 +42,11 @@ This command builds the image and creates a `result` symlink to the `.tar.gz` ar
       --name notices-automation \
       --restart always \
       --env-file .env \
+      -v notices-data:/data \
 localhost/slideshow-builder:latest
     ```
+    
+    **Note:** The `-v notices-data:/data` volume mount persists runtime configuration changes made via Matrix commands across container restarts and rebuilds.
 
 ## Management Commands
 Use these commands to monitor and manage the running automation:
@@ -72,15 +75,16 @@ podman rm notices-automation
 ```
 
 ## Pushing to a Registry
+**IMPORTANT if the version number ends with a -dev then only push to version number not latest**
 1.  **Tag the image (latest and versioned):**
     ```bash
     podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.3.0
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.0-dev
     ```
 2.  **Push the image:**
     ```bash
     podman push docker.io/pedley/slideshow-builder:latest
-    podman push docker.io/pedley/slideshow-builder:2.3.0
+    podman push docker.io/pedley/slideshow-builder:2.4.0-dev
     ```
 
 # Features
@@ -101,6 +105,7 @@ podman rm notices-automation
 - [x] Interactive Matrix Bot: Switched from Cron to APScheduler, integrated `matrix-nio` for notifications and interactive commands (`!rebuild`, `!status`, `!help`).
 - [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
 - [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
+- [x] Runtime Configuration Management: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!config`, `!defaults`), with persistent storage in SQLite database mounted as a volume.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).
