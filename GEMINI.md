@@ -24,29 +24,44 @@ Final deployment is via a container image, built using Nix. The script runs as a
 > [!TIP]
 > **Networking Tip**: If running health alerts (ntfy) on the same host as the container, use `NTFY_URL=http://host.containers.internal:8000` in your `.env` to allow the container to reach the host service reliably.
 
-## Building the Image
-To build the container image using Nix, run the following command from the project root:
-```bash
-nix build .#dockerImage
-```
-This command builds the image and creates a `result` symlink to the `.tar.gz` archive in the Nix store.
+## Automated Build & Deployment
+The easiest way to build and deploy the container is using the provided `build.sh` script.
 
-## Running with Podman
-1.  **Load the image into Podman:**
+### 1. Build the Image
+To build the image without deploying:
+```bash
+./build.sh
+```
+
+### 2. Build and Deploy Locally
+To build the image and automatically (re)deploy the container:
+```bash
+./build.sh --deploy
+```
+This script handles building with Nix, loading into Podman, stopping any existing container, and mounting local `./images` and `./music` folders if they exist.
+
+## Manual Deployment (Reference)
+If you prefer to run commands manually:
+
+1.  **Build with Nix:**
+    ```bash
+    nix build .#dockerImage
+    ```
+2.  **Load into Podman:**
     ```bash
     podman load -i result
     ```
-2.  **Start the production container:**
+3.  **Run the container:**
     ```bash
     podman run -d \
       --name notices-automation \
       --restart always \
       --env-file .env \
       -v notices-data:/data \
-localhost/slideshow-builder:latest
+      localhost/slideshow-builder:latest
     ```
     
-    **Note:** The `-v notices-data:/data` volume mount persists runtime configuration changes made via Matrix commands across container restarts and rebuilds.
+    **Note:** The `-v notices-data:/data` volume mount persists runtime configuration changes made via Matrix commands.
 
 ## Management Commands
 Use these commands to monitor and manage the running automation:
@@ -66,13 +81,6 @@ Use these commands to monitor and manage the running automation:
 - **Manual Trigger (via Matrix):**
   Send `!rebuild` in the Matrix chat room.
 
-## Updating the Automation
-When you have built and loaded a new image, you must remove the old container and start a new one to apply changes:
-```bash
-podman stop notices-automation
-podman rm notices-automation
-# Then run the 'podman run' command from the 'Running with Podman' section
-```
 
 ## Pushing to a Registry
 **IMPORTANT if the version number ends with a -dev then only push to version number not latest**
@@ -109,7 +117,7 @@ podman rm notices-automation
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).
-- [ ] Add more commands (e.g., `!cancel`, `!config`).
+- [ ] Add more commands (e.g., `!cancel`).
 
 ## Full interactive matrix bot implementation plan
 1. Recommended Library: matrix-nio
