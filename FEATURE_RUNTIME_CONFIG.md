@@ -19,6 +19,7 @@ This feature allows users to override configuration settings at runtime via Matr
 2. **`create_slideshow.py`**: Added Matrix commands for configuration management
    - `!set KEY VALUE` - Override a configuration setting
    - `!get KEY` - View current value of a setting
+   - `!get all` - View all configurable settings and their current status
    - `!config` - List all active configuration overrides
    - `!defaults` - Reset all settings to .env defaults
    - `!help` - Updated to show new commands
@@ -53,6 +54,7 @@ The following settings can be overridden at runtime:
 !set IMAGE_DURATION 15
 !set CRON_SCHEDULE "0 2 * * 6"
 !get IMAGE_DURATION
+!get all
 !config
 !defaults
 ```

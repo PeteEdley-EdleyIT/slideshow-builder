@@ -210,7 +210,8 @@ Your automation bot will send notifications and respond to commands in the Matri
 *   **Runtime Configuration:** 
     *   `!set KEY VALUE` - Override a configuration setting (e.g., `!set IMAGE_DURATION 15`)
     *   `!get KEY` - View the current value of a setting
-    *   `!config` - List all active configuration overrides
+    *   `!get all` - View all configurable settings and their status (Override vs Default)
+    *   `!config` - List only active configuration overrides
     *   `!defaults` - Reset all settings to .env defaults
 *   **Get Help:** Send `!help` in the Matrix chat room to see a list of available commands.
 

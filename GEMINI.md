@@ -71,7 +71,7 @@ Use these commands to monitor and manage the running automation:
   podman logs -f notices-automation
   ```
 - **View Bot Status (via Matrix):**
-  Send `!status` or `!help` in the Matrix chat room.
+  Send `!status`, `!get all`, or `!help` in the Matrix chat room.
 - **List Scheduled Tasks:**
   (Bot handles its own internal scheduling via APScheduler)
 - **Restart Bot:**
@@ -113,7 +113,7 @@ Use these commands to monitor and manage the running automation:
 - [x] Interactive Matrix Bot: Switched from Cron to APScheduler, integrated `matrix-nio` for notifications and interactive commands (`!rebuild`, `!status`, `!help`).
 - [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
 - [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
-- [x] Runtime Configuration Management: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!config`, `!defaults`), with persistent storage in SQLite database mounted as a volume.
+- [x] Runtime Configuration Management: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!get all`, `!config`, `!defaults`), with persistent storage in SQLite database mounted as a volume.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).

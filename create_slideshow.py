@@ -202,6 +202,24 @@ async def handle_matrix_message(matrix, room, event):
         settings.set(key, value)
         await matrix.send_message(f"✅ Set {key} = {value}\n\n⚠️ Changes will take effect on next rebuild.")
     
+    elif command == "!get all":
+        # Show all configurable settings and their current values
+        config = Config()
+        settings = get_settings_manager()
+        overrides = settings.list_all()
+        
+        lines = ["📋 **Full Configuration Status**\n"]
+        for key in CONFIGURABLE_SETTINGS:
+            value = getattr(config, key.lower(), "Not set")
+            is_override = key in overrides
+            marker = "🔹" if is_override else "▫️"
+            status = "(Override)" if is_override else "(Default)"
+            lines.append(f"{marker} **{key}**: {value} {status}")
+        
+        lines.append("\n🔹 = Runtime Override active")
+        lines.append("▫️ = Using .env/calculated default")
+        await matrix.send_message("\n".join(lines))
+
     elif command.startswith("!get "):
         # Parse: !get KEY
         parts = command.split(None, 1)
@@ -262,7 +280,8 @@ async def handle_matrix_message(matrix, room, event):
             "**Configuration:**\n"
             "• !set KEY VALUE - Override a configuration setting\n"
             "• !get KEY - View current value of a setting\n"
-            "• !config - List all active configuration overrides\n"
+            "• !get all - View all settings and their status\n"
+            "• !config - List only active configuration overrides\n"
             "• !defaults - Reset all settings to .env defaults\n\n"
             "• !help - Show this message\n\n"
             "**Configurable Settings:**\n"
