@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 # Internal Modules
 from config_manager import Config, get_env_var, get_env_bool
-from health_manager import HealthManager, silence_moviepy
+from health_manager import HealthManager
 from video_engine import VideoEngine
 from matrix_client import MatrixClient
 from nextcloud_client import NextcloudClient
@@ -31,7 +31,7 @@ from settings_manager import get_settings_manager
 # Initialize Global State
 load_dotenv()
 patch_moviepy()
-silence_moviepy()
+# silence_moviepy() - Replaced by real-time ProgressLogger in HealthManager
 
 # Global Health Instance
 health_mgr = HealthManager()
@@ -69,6 +69,7 @@ async def run_automation(matrix=None):
         ))
 
         # 1. Setup Clients
+        health_mgr.update_status("Starting", "Setting up Nextcloud client")
         if config.nc_url and config.nc_user:
             client = NextcloudClient(
                 config.nc_url, 
@@ -77,6 +78,7 @@ async def run_automation(matrix=None):
                 verify_ssl=not config.nc_insecure
             )
 
+        health_mgr.update_status("Starting", "Checking output paths")
         output_path = config.output_filepath
         if not output_path and config.upload_nextcloud_path:
             fd, output_path = tempfile.mkstemp(suffix=".mp4")
@@ -87,14 +89,20 @@ async def run_automation(matrix=None):
             raise ValueError("No output path specified and no Nextcloud upload path configured.")
 
         # 2. Run Engine with status reporting
-        engine = VideoEngine(config, client)
+        engine = VideoEngine(config, client, health_mgr=health_mgr)
         
         async def status_reporter(msg, stage):
             """Internal helper to notify Matrix and ntfy for each major step."""
+            # Update health manager for !status command
+            health_mgr.update_status(stage, msg.replace('✅ ', '').replace('💾 ', '').replace('☁️ ', ''))
+            
             if matrix.is_configured():
                 await matrix.send_message(msg)
             # Use specific tags for ntfy updates
             await asyncio.to_thread(health_mgr.send_ntfy, msg, title=f"Update: {stage}", tags=["information_source"])
+
+        # Validate resources before starting heavy processing
+        await engine.validate_resources()
 
         included_slides = await engine.create_slideshow(output_path, status_callback=status_reporter)
         
@@ -114,6 +122,7 @@ async def run_automation(matrix=None):
         )
 
     except Exception as e:
+        health_mgr.update_status(None) # Clear active status on error
         error_msg = str(e)
         trace_str = traceback.format_exc()
         print(f"ERROR: {error_msg}\\n{trace_str}")
@@ -173,6 +182,18 @@ async def handle_matrix_message(matrix, room, event):
             f"✅ **Last Success**: {stats['last_success']}\n"
             f"💓 **Heartbeat Active**: {'Yes' if stats['heartbeat_active'] else 'No'}\n"
         )
+        
+        # Show active task if something is running
+        if stats.get('active_stage'):
+            task = stats.get('active_task', 'Processing')
+            progress = stats.get('progress', 0)
+            status_msg += f"\n🚀 **Current Activity**: {stats['active_stage']}\n"
+            status_msg += f"📝 **Task**: {task}\n"
+            if progress > 0:
+                # Simple progress bar
+                bars = progress // 10
+                progress_bar = "▓" * bars + "░" * (10 - bars)
+                status_msg += f"📊 **Progress**: [{progress_bar}] {progress}%\n"
         
         # Quick Nextcloud Connectivity Check
         config = Config()

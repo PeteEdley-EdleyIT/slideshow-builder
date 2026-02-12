@@ -11,24 +11,39 @@ import time
 import requests
 import proglog
 
-# --- MoviePy Logging Suppression ---
+# --- MoviePy Logging Tracking ---
 
-class NullLogger(proglog.ProgressBarLogger):
+class StatusLogger(proglog.ProgressBarLogger):
     """
-    A logger that suppresses all output from proglog.
-    
-    MoviePy uses proglog for progress bars, which can be noisy in container logs.
-    This class overrides the default behavior to do nothing.
+    A logger that tracks progress from MoviePy and updates the HealthManager.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, health_mgr, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    def callback(self, *args, **kwargs): pass
-    def update(self, *args, **kwargs): pass
-    def message(self, *args, **kwargs): pass
+        self.health_mgr = health_mgr
+        self.last_update = 0
 
-def silence_moviepy():
-    """Sets proglog's default logger to NullLogger to suppress MoviePy output."""
-    proglog.default_bar_logger = lambda *args, **kwargs: NullLogger()
+    def callback(self, **kwargs):
+        """Called when a task progresses."""
+        if 'index' in kwargs and 'total' in kwargs:
+            # Only update if there is a meaningful change to avoid spamming
+            progress = int((kwargs['index'] / kwargs['total']) * 100)
+            if progress != self.last_update:
+                self.health_mgr.update_progress(progress)
+                self.last_update = progress
+
+    def bars_callback(self, bar, attr, value, old_value=None):
+        """Called when a bar (task) is created or updated."""
+        if attr == 'index':
+            total = self.bars[bar]['total']
+            if total > 0:
+                progress = int((value / total) * 100)
+                if progress != self.last_update:
+                    self.health_mgr.update_progress(progress)
+                    self.last_update = progress
+
+def get_status_logger(health_mgr):
+    """Returns a StatusLogger instance for MoviePy."""
+    return StatusLogger(health_mgr)
 
 
 # --- Health and Notification Management ---
@@ -53,6 +68,20 @@ class HealthManager:
         self.start_time = time.time()
         self.last_success_time = None
         self.last_heartbeat_time = None
+        self.current_task = None
+        self.current_stage = None
+        self.progress = 0
+
+    def update_status(self, stage, task=None):
+        """Updates the current active status/stage of the bot."""
+        self.current_stage = stage
+        self.current_task = task
+        if stage is None:
+            self.progress = 0
+
+    def update_progress(self, percentage):
+        """Updates the progress percentage of the current task."""
+        self.progress = percentage
 
     async def update_heartbeat(self):
         """
@@ -73,6 +102,7 @@ class HealthManager:
     def mark_success(self):
         """Records the time of a successful automation run."""
         self.last_success_time = time.time()
+        self.update_status(None) # Clear active status on completion
 
     def get_status_summary(self):
         """
@@ -82,11 +112,15 @@ class HealthManager:
             dict: A dictionary containing uptime, last success, and last heartbeat status.
         """
         uptime_seconds = int(time.time() - self.start_time)
-        return {
+        summary = {
             "uptime": f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
             "last_success": time.ctime(self.last_success_time) if self.last_success_time else "Never",
-            "heartbeat_active": self.last_heartbeat_time is not None
+            "heartbeat_active": self.last_heartbeat_time is not None,
+            "active_stage": self.current_stage,
+            "active_task": self.current_task,
+            "progress": self.progress
         }
+        return summary
 
     def send_ntfy(self, message, title=None, priority="default", tags=None):
         """
@@ -98,7 +132,7 @@ class HealthManager:
             priority (str, optional): Notification priority (e.g., 'high', 'low'). Defaults to 'default'.
             tags (list, optional): A list of tag keywords (e.g., ['rocket', 'boom']). Defaults to None.
         """
-        if not self.config or not self.config.enable_automation_ntfy:
+        if not self.config or not self.config.enable_ntfy:
             return
 
         ntfy_url = self.config.ntfy_url

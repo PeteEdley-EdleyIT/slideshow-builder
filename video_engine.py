@@ -19,6 +19,7 @@ from nextcloud_client import sort_key
 from audio_manager import AudioManager
 from slideshow_generator import SlideshowGenerator
 from video_utils import make_silent_audio
+from health_manager import get_status_logger
 
 class VideoEngine:
     """
@@ -31,7 +32,7 @@ class VideoEngine:
     4. Composing the final video with optional appends.
     5. Writing the output and uploading to Nextcloud.
     """
-    def __init__(self, config, nextcloud_client=None, target_size=(1920, 1080)):
+    def __init__(self, config, nextcloud_client=None, target_size=(1920, 1080), health_mgr=None):
         """
         Initializes the VideoEngine.
 
@@ -39,13 +40,69 @@ class VideoEngine:
             config (Config): An instance of the Config class containing settings.
             nextcloud_client (NextcloudClient, optional): Client for Nextcloud operations.
             target_size (tuple, optional): Target video resolution. Defaults to (1920, 1080).
+            health_mgr (HealthManager, optional): Manager for status and progress.
         """
         self.config = config
         self.nc_client = nextcloud_client
         self.target_size = target_size
+        self.health_mgr = health_mgr
         self.generator = SlideshowGenerator(target_size)
         self.audio_mgr = AudioManager(nextcloud_client)
 
+    async def validate_resources(self):
+        """
+        Validates that all required resources (images, music, upload paths) exist
+        before starting the time-consuming video generation.
+
+        Raises:
+            ValueError: If a required resource is missing or inaccessible.
+        """
+        if self.health_mgr:
+            self.health_mgr.update_status("Validating", "Checking resources and paths")
+
+        # 1. Check Image Source
+        if self.config.image_source == "nextcloud":
+            if not self.nc_client:
+                raise ValueError("Nextcloud client not initialized but Nextcloud image source selected.")
+            if not await asyncio.to_thread(self.nc_client.check_path_exists, self.config.nextcloud_image_path):
+                raise ValueError(f"Nextcloud image path does not exist: {self.config.nextcloud_image_path}")
+        else:
+            if not os.path.isdir(self.config.images_folder):
+                raise ValueError(f"Local images folder does not exist: {self.config.images_folder}")
+
+        # 2. Check Music Source (if configured)
+        if self.config.music_folder:
+            if self.config.music_source == "nextcloud":
+                if not self.nc_client:
+                    raise ValueError("Nextcloud client not initialized but Nextcloud music source selected.")
+                if not await asyncio.to_thread(self.nc_client.check_path_exists, self.config.music_folder):
+                    raise ValueError(f"Nextcloud music folder does not exist: {self.config.music_folder}")
+            else:
+                if not os.path.isdir(self.config.music_folder):
+                    raise ValueError(f"Local music folder does not exist: {self.config.music_folder}")
+
+        # 3. Check Append Video (if configured)
+        if self.config.append_video_path:
+            if self.config.append_video_source == "nextcloud":
+                if not self.nc_client:
+                    raise ValueError("Nextcloud client not initialized but Nextcloud append video source selected.")
+                if not await asyncio.to_thread(self.nc_client.check_path_exists, self.config.append_video_path):
+                    raise ValueError(f"Nextcloud append video file does not exist: {self.config.append_video_path}")
+            else:
+                if not os.path.isfile(self.config.append_video_path):
+                    raise ValueError(f"Local append video file does not exist: {self.config.append_video_path}")
+
+        # 4. Check Nextcloud Upload Destination (Parent Directory)
+        if self.config.upload_nextcloud_path:
+            if not self.nc_client:
+                raise ValueError("Nextcloud client not initialized but Nextcloud upload path configured.")
+            
+            # Check the parent directory of the upload path
+            parent_dir = os.path.dirname(self.config.upload_nextcloud_path)
+            if parent_dir and not await asyncio.to_thread(self.nc_client.check_path_exists, parent_dir):
+                raise ValueError(f"Nextcloud upload destination directory does not exist: {parent_dir}")
+        
+        print("Resources and paths validated successfully.")
     async def create_slideshow(self, output_filepath, status_callback=None):
         """
         Executes the full slideshow generation workflow.
@@ -66,14 +123,16 @@ class VideoEngine:
 
         try:
             # 1. Source Images
+            if self.health_mgr:
+                self.health_mgr.update_status("Sourcing", "Retrieving images")
             image_paths = self._source_images(temp_dirs)
-            if not image_paths:
-                raise RuntimeError("No images found in the specified source.")
 
             included_slides = [os.path.basename(p) for p in image_paths]
 
             # 2. Prepare Append Video
             if self.config.append_video_path:
+                if self.health_mgr:
+                    self.health_mgr.update_status("Sourcing", f"Downloading {os.path.basename(self.config.append_video_path)}")
                 local_video_path, fps_from_clip = self._prepare_append_video(temp_dirs)
                 append_video_clip = self.generator.load_append_video(local_video_path)
                 
@@ -91,10 +150,14 @@ class VideoEngine:
             # 4. Generate Slideshow & Audio
             slideshow_video = None
             if slideshow_target_duration > 0:
+                if self.health_mgr:
+                    self.health_mgr.update_status("Generating", "Creating slideshow video")
                 slideshow_video = self.generator.create_video(
                     image_paths, self.config.image_duration, slideshow_target_duration, fps
                 )
                 
+                if self.health_mgr:
+                    self.health_mgr.update_status("Generating", "Preparing background music")
                 slideshow_audio = self.audio_mgr.prepare_background_music(
                     self.config.music_folder, self.config.music_source, slideshow_target_duration, temp_dirs
                 )
@@ -119,17 +182,16 @@ class VideoEngine:
                     position=self.config.timer_position
                 )
             
-            if status_callback:
-                await status_callback("✅ Video processing and composition complete. Starting to encode and write to disk...", "processed")
-
             # 6. Export and Upload
-            await asyncio.to_thread(self.write_video_manually, final_video, output_filepath, fps)
+            await asyncio.to_thread(self.write_video_manually, final_video, output_filepath, fps, health_mgr=self.health_mgr)
             
             if status_callback:
                 filename = os.path.basename(output_filepath)
                 await status_callback(f"💾 Video file successfully written to local storage: `{filename}`", "written")
             
             if self.nc_client and self.config.upload_nextcloud_path:
+                if self.health_mgr:
+                    self.health_mgr.update_status("Uploading", f"Uploading to {self.config.upload_nextcloud_path}")
                 await asyncio.to_thread(self.nc_client.upload_file, output_filepath, self.config.upload_nextcloud_path)
                 if status_callback:
                     await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.upload_nextcloud_path}`", "uploaded")
@@ -186,22 +248,28 @@ class VideoEngine:
         return final
 
     @staticmethod
-    def write_video_manually(final_video, output_filepath, fps):
+    def write_video_manually(final_video, output_filepath, fps, health_mgr=None):
         """
-        Handles the manual ffmpeg writing process to bypass MoviePy decorator issues.
+        Handles the manual ffmpeg writing process with progress tracking.
         """
         print(f"Writing video to {output_filepath} (Duration: {final_video.duration}s, FPS: {fps})...")
         output_dir = os.path.dirname(output_filepath)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
+        # Setup progress tracking for the encoding stage
+        logger = "bar" # MoviePy default
+        if health_mgr:
+            logger = get_status_logger(health_mgr)
+            health_mgr.update_status("Encoding", "Generating final MP4")
+
         audio_temp = None
         try:
             if final_video.audio:
                 audio_temp = tempfile.NamedTemporaryFile(suffix=".m4a", delete=False).name
-                final_video.audio.write_audiofile(audio_temp, fps=44100, codec="aac", logger=None, verbose=False)
+                final_video.audio.write_audiofile(audio_temp, fps=44100, codec="aac", logger=logger, verbose=False)
             
-            ffmpeg_write_video(final_video, output_filepath, fps, codec="libx264", audiofile=audio_temp, logger=None, verbose=False)
+            ffmpeg_write_video(final_video, output_filepath, fps, codec="libx264", audiofile=audio_temp, logger=logger, verbose=False)
         finally:
             if audio_temp and os.path.exists(audio_temp):
                 os.remove(audio_temp)

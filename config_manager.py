@@ -113,14 +113,16 @@ class Config:
         self.nc_url = get_env_var("NEXTCLOUD_URL")
         self.nc_user = get_env_var("NEXTCLOUD_USERNAME")
         self.nc_pass = get_env_var("NEXTCLOUD_PASSWORD")
-        self.nc_image_path = get_env_var("NEXTCLOUD_IMAGE_PATH")
-        self.nc_upload_path = get_env_var("UPLOAD_NEXTCLOUD_PATH")
+        self.nc_image_path = get_env_var("NEXTCLOUD_IMAGE_PATH") # Deprecated, use nextcloud_image_path
+        self.nextcloud_image_path = self.nc_image_path
+        self.nc_upload_path = get_env_var("UPLOAD_NEXTCLOUD_PATH") # Deprecated, use upload_nextcloud_path
+        self.upload_nextcloud_path = self.nc_upload_path
         self.nc_insecure = get_env_bool("NEXTCLOUD_INSECURE_SSL", False)
         
         # Source Selection (auto-detect based on Nextcloud config, or use explicit setting)
         # If NEXTCLOUD_IMAGE_PATH is set, default to nextcloud, otherwise local
-        self.image_source = get_env_var("IMAGE_SOURCE", "nextcloud" if self.nc_image_path else "local")
-        self.music_source = get_env_var("MUSIC_SOURCE", "nextcloud" if self.nc_image_path else "local")
+        self.image_source = get_env_var("IMAGE_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
+        self.music_source = get_env_var("MUSIC_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
         
         # Append Video Configuration
         self.append_video_path = get_env_var("APPEND_VIDEO_PATH")
@@ -136,8 +138,8 @@ class Config:
         self.ntfy_url = get_env_var("NTFY_URL")
         self.ntfy_topic = get_env_var("NTFY_TOPIC")
         self.ntfy_token = get_env_var("NTFY_TOKEN")
-        self.enable_ntfy = get_env_bool("ENABLE_HEARTBEAT_NTFY", True) # Specifically for health alerts
-        self.enable_automation_ntfy = get_env_bool("ENABLE_NTFY", True)
+        self.enable_heartbeat_ntfy = get_env_bool("ENABLE_HEARTBEAT_NTFY", True) # Specifically for health alerts
+        self.enable_ntfy = get_env_bool("ENABLE_NTFY", True)
         
         # Scheduling & Health
         self.cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5")

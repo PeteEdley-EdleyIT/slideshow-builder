@@ -224,3 +224,22 @@ class NextcloudClient:
         except requests.exceptions.RequestException as e:
             print(f"Error uploading video to Nextcloud: {e}")
             raise # Re-raise the exception after logging
+
+    def check_path_exists(self, path):
+        """
+        Checks if a given path (file or directory) exists on Nextcloud.
+
+        Args:
+            path (str): The path to check on Nextcloud.
+
+        Returns:
+            bool: True if it exists, False otherwise.
+        """
+        url = self._get_webdav_url(path)
+        try:
+            # Depth 0 checks only the specified path itself
+            headers = {'Depth': '0'}
+            response = requests.request('PROPFIND', url, auth=self.auth, headers=headers, verify=self.verify_ssl)
+            return response.status_code in (200, 207)
+        except requests.exceptions.RequestException:
+            return False
