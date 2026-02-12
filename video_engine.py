@@ -11,6 +11,7 @@ import glob
 import shutil
 import tempfile
 import math
+import asyncio
 from moviepy.editor import concatenate_videoclips
 from moviepy.video.io.ffmpeg_writer import ffmpeg_write_video
 
@@ -122,16 +123,16 @@ class VideoEngine:
                 await status_callback("✅ Video processing and composition complete. Starting to encode and write to disk...", "processed")
 
             # 6. Export and Upload
-            self.write_video_manually(final_video, output_filepath, fps)
+            await asyncio.to_thread(self.write_video_manually, final_video, output_filepath, fps)
             
             if status_callback:
                 filename = os.path.basename(output_filepath)
                 await status_callback(f"💾 Video file successfully written to local storage: `{filename}`", "written")
             
-            if self.nc_client and self.config.nc_upload_path:
-                self.nc_client.upload_file(output_filepath, self.config.nc_upload_path)
+            if self.nc_client and self.config.upload_nextcloud_path:
+                await asyncio.to_thread(self.nc_client.upload_file, output_filepath, self.config.upload_nextcloud_path)
                 if status_callback:
-                    await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.nc_upload_path}`", "uploaded")
+                    await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.upload_nextcloud_path}`", "uploaded")
                 
             return included_slides
 
@@ -144,10 +145,10 @@ class VideoEngine:
 
     def _source_images(self, temp_dirs):
         """Internal helper to retrieve image paths from local or Nextcloud."""
-        if self.config.image_source == "nextcloud" and self.nc_client and self.config.nc_image_path:
+        if self.config.image_source == "nextcloud" and self.nc_client and self.config.nextcloud_image_path:
             print("Retrieving images from Nextcloud...")
             image_paths, temp_img_dir = self.nc_client.list_and_download_files(
-                self.config.nc_image_path, allowed_extensions=('.jpg', '.jpeg')
+                self.config.nextcloud_image_path, allowed_extensions=('.jpg', '.jpeg')
             )
             if temp_img_dir:
                 temp_dirs.append(temp_img_dir)

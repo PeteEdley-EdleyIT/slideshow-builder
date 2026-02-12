@@ -59,12 +59,14 @@ async def run_automation(matrix=None):
 
     try:
         print("Starting scheduled slideshow automation...")
-        health_mgr.send_ntfy(
-            "Starting slideshow production...",
-            title="Rebuild Started",
-            priority="low",
+        # Background the initial ntfy to avoid blocking
+        asyncio.create_task(asyncio.to_thread(
+            health_mgr.send_ntfy, 
+            "Starting slideshow production...", 
+            title="Rebuild Started", 
+            priority="low", 
             tags=["rocket", "running"]
-        )
+        ))
 
         # 1. Setup Clients
         if config.nc_url and config.nc_user:
@@ -76,7 +78,7 @@ async def run_automation(matrix=None):
             )
 
         output_path = config.output_filepath
-        if not output_path and config.nc_upload_path:
+        if not output_path and config.upload_nextcloud_path:
             fd, output_path = tempfile.mkstemp(suffix=".mp4")
             os.close(fd)
             temp_output_file = output_path
@@ -92,7 +94,7 @@ async def run_automation(matrix=None):
             if matrix.is_configured():
                 await matrix.send_message(msg)
             # Use specific tags for ntfy updates
-            health_mgr.send_ntfy(msg, title=f"Update: {stage}", tags=["information_source"])
+            await asyncio.to_thread(health_mgr.send_ntfy, msg, title=f"Update: {stage}", tags=["information_source"])
 
         included_slides = await engine.create_slideshow(output_path, status_callback=status_reporter)
         
@@ -100,11 +102,12 @@ async def run_automation(matrix=None):
         health_mgr.mark_success()
         
         if matrix.is_configured():
-            video_name = config.nc_upload_path or os.path.basename(output_path)
+            video_name = config.upload_nextcloud_path or os.path.basename(output_path)
             # send_success already includes the slide list, so it's a good final summary
             await matrix.send_success(video_name, included_slides)
             
-        health_mgr.send_ntfy(
+        await asyncio.to_thread(
+            health_mgr.send_ntfy,
             f"Slideshow production flow complete. {len(included_slides)} slides processed.",
             title="Production Complete",
             tags=["trophy"]
@@ -118,7 +121,8 @@ async def run_automation(matrix=None):
         if matrix.is_configured():
             await matrix.send_failure(error_msg, trace_str)
         
-        health_mgr.send_ntfy(
+        await asyncio.to_thread(
+            health_mgr.send_ntfy,
             f"Slideshow production failed: {error_msg}",
             title="Slideshow Failed",
             priority="high",
@@ -209,16 +213,30 @@ async def handle_matrix_message(matrix, room, event):
         overrides = settings.list_all()
         
         lines = ["📋 **Full Configuration Status**\n"]
+        html_lines = ["<h3>📋 Full Configuration Status</h3>"]
+        
         for key in CONFIGURABLE_SETTINGS:
             value = getattr(config, key.lower(), "Not set")
             is_override = key in overrides
             marker = "🔹" if is_override else "▫️"
             status = "(Override)" if is_override else "(Default)"
+            
+            # Plain text version
             lines.append(f"{marker} **{key}**: {value} {status}")
+            
+            # HTML version with color-coded variables
+            color = "blue" if is_override else "green"
+            html_lines.append(
+                f"{marker} <font color='{color}'><b>{key}</b></font>: {value} <i>{status}</i><br/>"
+            )
         
         lines.append("\n🔹 = Runtime Override active")
         lines.append("▫️ = Using .env/calculated default")
-        await matrix.send_message("\n".join(lines))
+        
+        html_lines.append("<p><br/>🔹 = <font color='blue'>Runtime Override active</font><br/>")
+        html_lines.append("▫️ = <font color='green'>Using .env/calculated default</font></p>")
+        
+        await matrix.send_message("\n".join(lines), html_message="".join(html_lines))
 
     elif command.startswith("!get "):
         # Parse: !get KEY
@@ -272,27 +290,56 @@ async def handle_matrix_message(matrix, room, event):
         await matrix.send_message(original_message)
         
     elif command == "!help":
+        # Categories and commands with emojis
         help_text = (
-            "**Available Commands:**\n\n"
-            "**Automation:**\n"
-            "• !rebuild - Trigger a manual video generation\n"
-            "• !status - Check the bot's health and uptime\n\n"
-            "**Configuration:**\n"
-            "• !set KEY VALUE - Override a configuration setting\n"
-            "• !get KEY - View current value of a setting\n"
-            "• !get all - View all settings and their status\n"
-            "• !config - List only active configuration overrides\n"
-            "• !defaults - Reset all settings to .env defaults\n\n"
-            "• !help - Show this message\n\n"
-            "**Configurable Settings:**\n"
-            "IMAGE_DURATION, TARGET_VIDEO_DURATION, CRON_SCHEDULE,\n"
-            "IMAGE_SOURCE, MUSIC_SOURCE,\n"
-            "NEXTCLOUD_IMAGE_PATH, UPLOAD_NEXTCLOUD_PATH,\n"
-            "APPEND_VIDEO_PATH, APPEND_VIDEO_SOURCE,\n"
-            "ENABLE_HEARTBEAT, NTFY_TOPIC, ENABLE_NTFY,\n"
-            "ENABLE_TIMER, TIMER_MINUTES, TIMER_POSITION"
+            "🤖 **Slideshow Bot Help**\n\n"
+            "**🚀 Automation:**\n"
+            "• `!rebuild` - Trigger a manual video generation\n"
+            "• `!status` - Check the bot's health and uptime\n\n"
+            "**⚙️ Configuration:**\n"
+            "• `!set KEY VALUE` - Override a setting\n"
+            "• `!get KEY` - View current value of a setting\n"
+            "• `!get all` - View all settings and status\n"
+            "• `!config` - List active overrides\n"
+            "• `!defaults` - Reset all to .env defaults\n\n"
+            "**❓ General:**\n"
+            "• `!help` - Show this message\n\n"
+            "**📝 Configurable Settings:**\n" + 
+            ", ".join(CONFIGURABLE_SETTINGS)
         )
-        await matrix.send_message(help_text)
+        
+        # HTML version with 2-column table for settings
+        settings_html = "<table style='width:100%'>"
+        for i in range(0, len(CONFIGURABLE_SETTINGS), 2):
+            col1 = CONFIGURABLE_SETTINGS[i]
+            col2 = CONFIGURABLE_SETTINGS[i+1] if i+1 < len(CONFIGURABLE_SETTINGS) else ""
+            settings_html += f"<tr><td>• <code>{col1}</code></td><td>{f'• <code>{col2}</code>' if col2 else ''}</td></tr>"
+        settings_html += "</table>"
+        
+        html_help = (
+            "<h3>🤖 Slideshow Bot Help</h3>"
+            "<h4>🚀 Automation</h4>"
+            "<ul>"
+            "<li><code>!rebuild</code> - Trigger a manual video generation</li>"
+            "<li><code>!status</code> - Check the bot's health and uptime</li>"
+            "</ul>"
+            "<h4>⚙️ Configuration</h4>"
+            "<ul>"
+            "<li><code>!set KEY VALUE</code> - Override a configuration setting</li>"
+            "<li><code>!get KEY</code> - View current value of a setting</li>"
+            "<li><code>!get all</code> - View all settings and their status</li>"
+            "<li><code>!config</code> - List only active configuration overrides</li>"
+            "<li><code>!defaults</code> - Reset all settings to .env defaults</li>"
+            "</ul>"
+            "<h4>❓ General</h4>"
+            "<ul>"
+            "<li><code>!help</code> - Show this message</li>"
+            "</ul>"
+            "<h4>📝 Configurable Settings</h4>"
+            f"{settings_html}"
+        )
+        
+        await matrix.send_message(help_text, html_message=html_help)
 
 
 async def main():
