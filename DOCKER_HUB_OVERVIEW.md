@@ -13,6 +13,8 @@ This project provides a robust, containerized solution for generating engaging v
 *   **Nextcloud Integration:** Effortlessly syncs with your Nextcloud instance for media management.
 *   **Interactive Matrix Bot:** Receive notifications, trigger builds, and check detailed status metrics directly from your Matrix chat room.
 *   **Runtime Configuration Management:** Override configuration settings on-the-fly via Matrix commands. Changes persist across container restarts.
+*   **Fail-Fast Resource Validation:** Verifies Nextcloud paths and assets exist before starting time-consuming renders.
+*   **Live Progress Tracking:** Monitor the active production stage and view a visual progress bar during video encoding.
 *   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
 *   **Containerized Deployment:** Easy to deploy and manage using Podman or Docker.
 

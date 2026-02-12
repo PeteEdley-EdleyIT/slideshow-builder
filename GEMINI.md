@@ -87,12 +87,12 @@ Use these commands to monitor and manage the running automation:
 1.  **Tag the image (latest and versioned):**
     ```bash
     podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.0-dev
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.0
     ```
 2.  **Push the image:**
     ```bash
     podman push docker.io/pedley/slideshow-builder:latest
-    podman push docker.io/pedley/slideshow-builder:2.4.0-dev
+    podman push docker.io/pedley/slideshow-builder:2.4.0
     ```
 
 # Features
@@ -114,6 +114,9 @@ Use these commands to monitor and manage the running automation:
 - [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
 - [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
 - [x] Runtime Configuration Management: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!get all`, `!config`, `!defaults`), with persistent storage in SQLite database mounted as a volume.
+- [x] Fail-Fast Resource Validation: Bot verifies Nextcloud paths and local assets exist before starting the time-consuming video rendering process.
+- [x] Real-time Progress Tracking: Matrix `!status` command now shows the active production stage (Sourcing, Generating, Encoding, Uploading) and a visual progress bar during the encoding phase.
+- [x] Async Execution: Moved CPU-intensive rendering and potentially slow network calls (ntfy) to background threads to keep the Matrix bot responsive.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).

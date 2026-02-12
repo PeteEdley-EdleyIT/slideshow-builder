@@ -23,6 +23,8 @@ This project automatically creates video slideshows from image and music files, 
     *   **Proactive Status Reporting:** Matrix `!status` command provides detailed metrics (uptime, last success, last heartbeat).
 *   **Countdown Timer Overlay:** Optionally add a countdown timer to the final minutes of the video, with fixed top-middle positioning for high visibility.
 *   **Runtime Configuration Management:** Override configuration settings on-the-fly via Matrix commands (`!set`, `!get`, `!config`, `!defaults`). Changes persist across container restarts.
+*   **Fail-Fast Resource Validation:** Pre-flight checks verify all images, music, and upload paths exist before starting the render.
+*   **Async Execution & Progress Tracking:** Heavy processing runs in background threads, keeping the bot responsive, with real-time progress bars available in `!status`.
 *   **Containerized for Easy Deployment:** Provided as a Docker image for straightforward setup and management using Podman or Docker.
 
 ## Deployment
@@ -205,15 +207,15 @@ docker push yourusername/slideshow-builder:latest
 
 Your automation bot will send notifications and respond to commands in the Matrix room you configured.
 
-*   **View Bot Status:** Send `!status` in the Matrix chat room to check if the bot is online, view its uptime, and see when the last video was successfully produced.
+*   **View Bot Status:** Send `!status` in the Matrix chat room to check if the bot is online, view its uptime, and see when the last video was successfully produced. If a production is currently running, it will show the active stage (e.g., Encoding) and a **visual progress bar**.
 *   **Manual Video Generation:** Send `!rebuild` in the Matrix chat room to immediately trigger the video generation process. The bot will notify you when it starts and finishes.
 *   **Runtime Configuration:** 
     *   `!set KEY VALUE` - Override a configuration setting (e.g., `!set IMAGE_DURATION 15`)
     *   `!get KEY` - View the current value of a setting
-    *   `!get all` - View all configurable settings and their status (Override vs Default)
+    *   `!get all` - View all configurable settings and their status (Override vs Default, with color-coding)
     *   `!config` - List only active configuration overrides
     *   `!defaults` - Reset all settings to .env defaults
-*   **Get Help:** Send `!help` in the Matrix chat room to see a list of available commands.
+*   **Get Help:** Send `!help` in the Matrix chat room to see a list of available commands in a clean, categorized layout.
 
 ## Configuration
 
@@ -241,6 +243,7 @@ All aspects of the slideshow automation are configured via environment variables
 | `MATRIX_USER_ID`         | The full Matrix user ID of your bot (e.g., `@botname:yourhomeserver.com`). Required for Matrix bot.    | (None)          |
 | `CRON_SCHEDULE`          | A cron expression that defines the schedule for automatic video generation. For example, `0 1 * * 5` means "every Friday at 1:00 AM". | `0 1 * * 5`     |
 | `ENABLE_HEARTBEAT`       | Set to `true` to enable the creation of a heartbeat file (`/tmp/heartbeat`) for use with container healthchecks. | `false`         |
+| `ENABLE_NTFY`            | Master switch to enable/disable ntfy notifications.                                                     | `false`         |
 | `NTFY_URL`               | The base URL of your ntfy.sh server (e.g., `https://ntfy.sh` or your self-hosted instance). Notifications are only sent if both `NTFY_URL` and `NTFY_TOPIC` are set. | (None)          |
 | `NTFY_TOPIC`             | The ntfy topic name to publish notifications to.                                                        | (None)          |
 | `NTFY_TOKEN`             | Optional authentication token for your ntfy server.                                                     | (None)          |
