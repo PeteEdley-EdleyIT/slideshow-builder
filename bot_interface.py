@@ -28,6 +28,20 @@ class BotInterface:
             f"💓 **Heartbeat Active**: {'Yes' if stats['heartbeat_active'] else 'No'}\n"
         )
         
+        # Quick Nextcloud Connectivity Check
+        if config.nc_url and config.nc_user:
+            try:
+                # We use a short timeout for the check
+                NextcloudClient(
+                    config.nc_url, 
+                    config.nc_user, 
+                    config.nc_pass, 
+                    verify_ssl=not config.nc_insecure
+                )
+                status_msg += "☁️ **Nextcloud**: Connected\n"
+            except Exception:
+                status_msg += "☁️ **Nextcloud**: ❌ Connection Failed\n"
+
         # Show active task if something is running
         if stats.get('active_stage'):
             task = stats.get('active_task', 'Processing')
@@ -42,20 +56,6 @@ class BotInterface:
                 bars = progress // 10
                 progress_bar = "▓" * bars + "░" * (10 - bars)
                 status_msg += f"📊 **Progress**: [{progress_bar}] {progress}%\n"
-        
-        # Quick Nextcloud Connectivity Check
-        if config.nc_url and config.nc_user:
-            try:
-                # We use a short timeout for the check
-                NextcloudClient(
-                    config.nc_url, 
-                    config.nc_user, 
-                    config.nc_pass, 
-                    verify_ssl=not config.nc_insecure
-                )
-                status_msg += "☁️ **Nextcloud**: Connected\n"
-            except Exception:
-                status_msg += "☁️ **Nextcloud**: ❌ Connection Failed\n"
         
         return status_msg
 
