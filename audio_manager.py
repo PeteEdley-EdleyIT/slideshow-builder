@@ -39,94 +39,99 @@ class AudioManager:
         """
         Retrieves, selects, and processes background music to match the target video duration.
 
-        This method handles fetching music files from either a local folder or Nextcloud.
-        It shuffles the available tracks and loops them as necessary to cover the
-        `target_duration`, adding a buffer to ensure sufficient audio. A fade-out
-        effect is applied towards the end of the generated audio clip.
-
-        Args:
-            music_folder (str): The path to the folder containing music files
-                                (local path or Nextcloud remote path).
-            music_source (str): Specifies where to retrieve music files from ('local' or 'nextcloud').
-            target_duration (int): The desired duration (in seconds) of the background music.
-            temp_dir_list (list): A list to which any created temporary directories
-                                  (e.g., for downloaded Nextcloud music) will be appended.
-
         Returns:
-            AudioClip: A MoviePy AudioClip object representing the prepared background music,
-                       or None if no music files are found or an error occurs during processing.
+            tuple: (AudioClip, list of attributions)
+                   Attributions is a list of tuples: (start_time, metadata_text)
         """
         music_files = []
         temp_music_dir = None
 
         if music_source == "nextcloud" and music_folder and self.nextcloud_client:
-            print("Retrieving background music from Nextcloud...")
-            # List and download music files from Nextcloud
+            print("Retrieving background music from Nextcloud (mp3 + md)...")
+            # List and download both mp3 and metadata files
             music_files, temp_music_dir = self.nextcloud_client.list_and_download_files(
-                music_folder, allowed_extensions=('.mp3',)
+                music_folder, allowed_extensions=('.mp3', '.md')
             )
             if temp_music_dir:
-                temp_dir_list.append(temp_music_dir) # Keep track of temp dir for cleanup
+                temp_dir_list.append(temp_music_dir)
         elif music_source == "local" and music_folder:
-            # Get local MP3 files
-            music_files = sorted(glob.glob(os.path.join(music_folder, "*.mp3")))
+            # Get local files
+            for ext in ('.mp3', '.md'):
+                music_files.extend(glob.glob(os.path.join(music_folder, f"*{ext}")))
+                music_files.extend(glob.glob(os.path.join(music_folder, f"*{ext.upper()}")))
 
         if not music_files:
             print("No music files found.")
-            return None
+            return None, []
 
-        print(f"Found {len(music_files)} music tracks. Creating background audio...")
+        # Separate mp3 and md files
+        mp3_files = [f for f in music_files if f.lower().endswith('.mp3')]
+        md_files = [f for f in music_files if f.lower().endswith('.md')]
+        
+        # Link metadata to tracks
+        track_metadata = {}
+        for mp3 in mp3_files:
+            base = os.path.splitext(mp3)[0]
+            md_match = next((md for md in md_files if os.path.splitext(md)[0] == base), None)
+            if md_match:
+                try:
+                    with open(md_match, 'r', encoding='utf-8') as f:
+                        track_metadata[mp3] = f.read()
+                except Exception as e:
+                    print(f"Warning: Could not read metadata file {md_match}: {e}")
+            else:
+                track_metadata[mp3] = None
+
+        print(f"Found {len(mp3_files)} music tracks. Creating background audio...")
         try:
             selected_music = []
+            attributions = [] # List of (start_time, metadata_text)
             current_music_duration = 0
-            music_pool = list(music_files) # Create a mutable copy for shuffling
-            random.shuffle(music_pool) # Randomize the order of tracks
+            music_pool = list(mp3_files)
+            random.shuffle(music_pool)
 
-            # Loop through music tracks, adding them until target_duration is met
-            # Add a buffer (e.g., 30s) to ensure enough audio for fade-out and exact duration
             while current_music_duration < target_duration + 30:
                 if not music_pool:
-                    # If all tracks have been used, reshuffle and reuse
-                    music_pool = list(music_files)
+                    music_pool = list(mp3_files)
                     random.shuffle(music_pool)
                 
-                track_path = music_pool.pop(0) # Get a random track
+                track_path = music_pool.pop(0)
                 try:
                     track = AudioFileClip(track_path)
+                    
+                    # Record attribution if metadata exists
+                    metadata = track_metadata.get(track_path)
+                    if metadata and current_music_duration < target_duration:
+                        attributions.append((current_music_duration, metadata))
+                    
                     selected_music.append(track)
                     current_music_duration += track.duration
                 except Exception as e:
                     print(f"Error loading music track {track_path}: {e}")
-                    # Continue with other tracks even if one fails
 
             if not selected_music:
-                return None
+                return None, []
 
             # Concatenate all selected music clips
             full_music = concatenate_audioclips(selected_music)
             
-            # Fade out configuration: Start fade 15s before end, fade over 10s, 5s silence
-            fade_duration = 10 # Duration of the fade-out effect
-            audio_end = max(0, target_duration - 5) # Point where audio should effectively end (5s before target_duration)
+            # Fade out configuration
+            fade_duration = 10
+            audio_end = max(0, target_duration - 5)
             
-            # Subclip the concatenated music to the desired length for fade-out
             bg_music = full_music.subclip(0, audio_end).set_duration(audio_end)
             
             try:
-                # Apply fade-out effect
                 bg_music = audio_fadeout(bg_music, fade_duration)
             except Exception as e:
                 print(f"WARNING: audio_fadeout failed: {e}")
-                # Continue without fade-out if it fails
 
-            # Composite over a silent track to ensure the exact target_duration
-            # This handles cases where the music might be slightly shorter than target_duration
             full_silent_audio = make_silent_audio(target_duration)
             slideshow_audio = CompositeAudioClip([full_silent_audio, bg_music])
-            slideshow_audio.duration = target_duration # Ensure final duration is exact
+            slideshow_audio.duration = target_duration
             
-            return slideshow_audio
+            return slideshow_audio, attributions
 
         except Exception as e:
             print(f"Error processing background music: {e}")
-            return None
+            return None, []

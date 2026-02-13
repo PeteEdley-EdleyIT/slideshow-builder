@@ -84,15 +84,13 @@ Use these commands to monitor and manage the running automation:
 
 ## Pushing to a Registry
 **IMPORTANT if the version number ends with a -dev then only push to version number not latest**
-1.  **Tag the image (latest and versioned):**
+1.  **Tag the image (versioned only for dev):**
     ```bash
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.4
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.5.0-dev
     ```
 2.  **Push the image:**
     ```bash
-    podman push docker.io/pedley/slideshow-builder:latest
-    podman push docker.io/pedley/slideshow-builder:2.4.4
+    podman push docker.io/pedley/slideshow-builder:2.5.0-dev
     ```
 
 # Features
@@ -118,6 +116,7 @@ Use these commands to monitor and manage the running automation:
 - [x] Progress Updates via Matrix: Real-time stage tracking in `!status` and granular completion/upload notifications in the chat room.
 - [x] Async Execution: Moved CPU-intensive rendering and potentially slow network calls (ntfy) to background threads to keep the Matrix bot responsive.
 - [x] Concurrency Protection: Prevents multiple simultaneous video production runs with user-friendly "busy" notifications via Matrix and ntfy.
+- [x] Music Attribution Overlays: Automatically displays attribution details (from matching .md files) for the first 30 seconds of each background track.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).

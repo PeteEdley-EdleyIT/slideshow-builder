@@ -120,6 +120,7 @@ class VideoEngine:
         temp_dirs = []
         append_video_clip = None
         fps = 5 # Default starting FPS
+        music_attributions = []
 
         try:
             # 1. Source Images
@@ -159,18 +160,29 @@ class VideoEngine:
                 
                 if self.health_mgr:
                     self.health_mgr.update_status("Generating", "Preparing background music")
-                slideshow_audio = await asyncio.to_thread(
+                slideshow_audio, music_attributions = await asyncio.to_thread(
                     self.audio_mgr.prepare_background_music,
                     self.config.music_folder, self.config.music_source, slideshow_target_duration, temp_dirs
                 )
                 
                 if not slideshow_audio:
                     slideshow_audio = make_silent_audio(slideshow_target_duration)
+                    music_attributions = []
                 
                 slideshow_video = slideshow_video.set_audio(slideshow_audio)
 
             # 5. Final Composition
             final_video = self._compose_final(slideshow_video, append_video_clip, fps)
+            
+            # Apply Music Attributions if any
+            if music_attributions:
+                print(f"Applying {len(music_attributions)} music attribution overlays...")
+                final_video = await asyncio.to_thread(
+                    self.generator.apply_music_attributions,
+                    final_video,
+                    music_attributions,
+                    display_duration=30
+                )
             
             # Apply Timer Overlay if enabled
             if self.config.enable_timer:

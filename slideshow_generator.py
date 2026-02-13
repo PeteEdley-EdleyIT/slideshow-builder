@@ -12,7 +12,7 @@ import math
 import numpy as np
 from moviepy.editor import ImageClip, concatenate_videoclips, VideoFileClip, CompositeVideoClip
 from video_utils import resize_image
-from overlay_manager import TimerOverlay
+from overlay_manager import TimerOverlay, MusicAttributionOverlay
 
 class SlideshowGenerator:
     """
@@ -156,3 +156,41 @@ class SlideshowGenerator:
         # Ensure the background clip is explicitly set to avoid inheritance issues
         from moviepy.editor import CompositeVideoClip
         return CompositeVideoClip([video_clip] + timer_clips).set_duration(video_clip.duration)
+
+    def apply_music_attributions(self, video_clip, attributions, display_duration=30):
+        """
+        Applies music attribution overlays to the video clip.
+        
+        Args:
+            video_clip (VideoClip): The video clip to overlay attributions on.
+            attributions (list): List of (start_time, metadata_text) tuples.
+            display_duration (int): How long each attribution should be shown.
+
+        Returns:
+            VideoClip: The video clip with attribution overlays.
+        """
+        if not attributions:
+            return video_clip
+            
+        attr_overlay = MusicAttributionOverlay(target_size=self.target_size)
+        attr_clips = []
+        
+        for start_time, metadata in attributions:
+            # Create the attribution clip
+            # Ensure it doesn't exceed the video duration
+            duration = min(display_duration, video_clip.duration - start_time)
+            if duration <= 0:
+                continue
+                
+            a_clip = attr_overlay.create_attribution_clip(
+                attribution_text=metadata,
+                duration=duration
+            ).set_start(start_time)
+            
+            attr_clips.append(a_clip)
+            
+        if not attr_clips:
+            return video_clip
+            
+        from moviepy.editor import CompositeVideoClip
+        return CompositeVideoClip([video_clip] + attr_clips).set_duration(video_clip.duration)

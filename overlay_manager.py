@@ -61,3 +61,66 @@ class TimerOverlay:
         # Composite them
         timer_layered = CompositeVideoClip([bg_clip, txt_clip.set_position("center")], size=(box_w, box_h))
         return timer_layered.set_position(pos)
+
+
+class MusicAttributionOverlay:
+    """
+    Handles the generation of music attribution overlays.
+    """
+    def __init__(self, target_size=(1920, 1080), font='DejaVu-Sans', font_size=24, color='white'):
+        self.target_size = target_size
+        self.font = font
+        self.font_size = font_size
+        self.color = color
+
+    def create_attribution_clip(self, attribution_text, duration, position='bottom-left'):
+        """
+        Creates an attribution overlay for a specific duration.
+        
+        Args:
+            attribution_text (str): The text to display (Creator, Artist, Title, Link).
+            duration (float): How long the overlay should last.
+            position (str): Positioning hint. Defaults to 'bottom-left'.
+
+        Returns:
+            VideoClip: A moviepy clip with the attribution.
+        """
+        # Clean up text (strip leading/trailing whitespace and newlines)
+        text = attribution_text.strip()
+        
+        # Max width is 1/3 of the screen
+        max_w = self.target_size[0] // 3
+        # Max height is 1/5 of the screen
+        max_h = self.target_size[1] // 5
+        
+        # Create the text clip
+        txt_clip = TextClip(
+            text, 
+            fontsize=self.font_size, 
+            color=self.color, 
+            font=self.font,
+            method='caption',
+            size=(max_w - 40, None), # Let height be dynamic but bounded
+            align='West'
+        ).set_duration(duration)
+        
+        # Get actual text dimensions
+        txt_w, txt_h = txt_clip.size
+        box_w, box_h = txt_w + 40, txt_h + 30
+        
+        # Add a semi-transparent box for readability
+        bg_clip = ColorClip(size=(box_w, box_h), color=(0, 0, 0), ismask=False).set_opacity(0.6).set_duration(duration)
+        
+        # Fixed position logic
+        if position == 'bottom-left':
+            # Horizontal: 50 pixels from left. Vertical: 50 pixels from bottom.
+            x = 50
+            y = self.target_size[1] - box_h - 50
+            pos = (x, y)
+        else:
+            # Fallback to bottom-right
+            pos = ("right", "bottom")
+            
+        # Composite them
+        attr_layered = CompositeVideoClip([bg_clip, txt_clip.set_position("center")], size=(box_w, box_h))
+        return attr_layered.set_position(pos)
