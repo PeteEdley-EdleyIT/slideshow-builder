@@ -8,8 +8,8 @@ This project automatically creates video slideshows from image and music files, 
 *   **Flexible Media Sourcing:** Images and background music can be pulled from either local folders or a Nextcloud instance.
 *   **Customizable Video Output:**
     *   Control how long each image is displayed.
-    *   Set the total duration of the final video.
-    *   Optionally append an existing video to the end of the slideshow.
+    *   Optional countdown timer overlay for the last $X$ minutes.
+    *   **Automatic Music Attribution:** Displays creator, artist, and link for background tracks (if a matching `.md` file exists).
 *   **Smart Image Handling:** Images are automatically ordered numerically.
 *   **Nextcloud Integration:** Seamlessly connects with your Nextcloud for image input, music input, and saving the final video.
 *   **Background Music:** Randomly selects background music and fades it out smoothly as the video ends.
