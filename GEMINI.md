@@ -86,11 +86,11 @@ Use these commands to monitor and manage the running automation:
 **IMPORTANT if the version number ends with a -dev then only push to version number not latest**
 1.  **Tag the image (versioned only for dev):**
     ```bash
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.5.0-dev
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.5.0
     ```
 2.  **Push the image:**
     ```bash
-    podman push docker.io/pedley/slideshow-builder:2.5.0-dev
+    podman push docker.io/pedley/slideshow-builder:2.5.0
     ```
 
 # Features
