@@ -157,7 +157,7 @@ class SlideshowGenerator:
         from moviepy.editor import CompositeVideoClip
         return CompositeVideoClip([video_clip] + timer_clips).set_duration(video_clip.duration)
 
-    def apply_music_attributions(self, video_clip, attributions, display_duration=30):
+    def apply_music_attributions(self, video_clip, attributions, display_duration=15):
         """
         Applies music attribution overlays to the video clip.
         

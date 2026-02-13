@@ -181,7 +181,7 @@ class VideoEngine:
                     self.generator.apply_music_attributions,
                     final_video,
                     music_attributions,
-                    display_duration=30
+                    display_duration=15
                 )
             
             # Apply Timer Overlay if enabled
