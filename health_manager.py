@@ -70,13 +70,18 @@ class HealthManager:
         self.last_heartbeat_time = None
         self.current_task = None
         self.current_stage = None
+        self.current_job_start_time = None
         self.progress = 0
 
     def update_status(self, stage, task=None):
         """Updates the current active status/stage of the bot."""
         self.current_stage = stage
         self.current_task = task
-        if stage is None:
+        if stage:
+            if self.current_job_start_time is None:
+                self.current_job_start_time = time.time()
+        else:
+            self.current_job_start_time = None
             self.progress = 0
 
     def update_progress(self, percentage):
@@ -118,6 +123,7 @@ class HealthManager:
             "heartbeat_active": self.last_heartbeat_time is not None,
             "active_stage": self.current_stage,
             "active_task": self.current_task,
+            "job_start_time": time.ctime(self.current_job_start_time) if self.current_job_start_time else None,
             "progress": self.progress
         }
         return summary

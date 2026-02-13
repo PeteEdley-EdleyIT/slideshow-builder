@@ -32,7 +32,10 @@ class BotInterface:
         if stats.get('active_stage'):
             task = stats.get('active_task', 'Processing')
             progress = stats.get('progress', 0)
+            start_time = stats.get('job_start_time', 'Unknown')
+            
             status_msg += f"\n🚀 **Current Activity**: {stats['active_stage']}\n"
+            status_msg += f"📅 **Started At**: {start_time}\n"
             status_msg += f"📝 **Task**: {task}\n"
             if progress > 0:
                 # Simple progress bar

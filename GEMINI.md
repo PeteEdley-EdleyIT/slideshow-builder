@@ -109,7 +109,7 @@ Use these commands to monitor and manage the running automation:
 - [x] Background Music: Specify folder (local/Nextcloud), random selection, fade out over last 15s (10s fade, 5s silence) of slideshow.
 - [x] Notification System: Send success/failure messages to a Matrix chat room, including the list of slides or error details.
 - [x] Interactive Matrix Bot: Switched from Cron to APScheduler, integrated `matrix-nio` for notifications and interactive commands (`!rebuild`, `!status`, `!help`).
-- [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
+- [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command (now including job start times).
 - [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
 - [x] Advanced Configuration via Matrix: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!get all`, `!config`, `!defaults`), with persistent storage in SQLite database.
 - [x] Fail-Fast Resource Validation: Bot verifies Nextcloud paths and local assets exist before starting the time-consuming video rendering process.
