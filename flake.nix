@@ -50,7 +50,7 @@
           mkdir -p $out/tmp
           mkdir -p $out/var/run
           mkdir -p $out/var/log
-          mkdir -p $out/etc/crontabs
+          mkdir -p $out/etc
           echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
           echo "root:x:0:" > $out/etc/group
         '';
@@ -60,7 +60,6 @@
           paths = [
             pkgs.bash
             pkgs.ffmpeg
-            pkgs.cron
             pkgs.coreutils
             pkgs.gnugrep
             pkgs.gnused
@@ -109,7 +108,6 @@
                   pythonEnv
                   pkgs.bash
                   pkgs.ffmpeg
-                  pkgs.cron
                   pkgs.coreutils
                   pkgs.gnugrep
                   pkgs.gnused
