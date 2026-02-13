@@ -113,10 +113,11 @@ Use these commands to monitor and manage the running automation:
 - [x] Interactive Matrix Bot: Switched from Cron to APScheduler, integrated `matrix-nio` for notifications and interactive commands (`!rebuild`, `!status`, `!help`).
 - [x] Health Checks & Alerting: Podman native healthcheck via heartbeat file, ntfy.sh integration for success/failure alerts, and enhanced Matrix `!status` command.
 - [x] Countdown Timer Overlay: Optional countdown overlay for the last $X$ minutes of the video, with fixed top-middle positioning and support for ImageMagick text rendering.
-- [x] Runtime Configuration Management: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!get all`, `!config`, `!defaults`), with persistent storage in SQLite database mounted as a volume.
+- [x] Advanced Configuration via Matrix: Ability to override configuration settings via Matrix commands (`!set`, `!get`, `!get all`, `!config`, `!defaults`), with persistent storage in SQLite database.
 - [x] Fail-Fast Resource Validation: Bot verifies Nextcloud paths and local assets exist before starting the time-consuming video rendering process.
-- [x] Real-time Progress Tracking: Matrix `!status` command now shows the active production stage (Sourcing, Generating, Encoding, Uploading) and a visual progress bar during the encoding phase.
+- [x] Progress Updates via Matrix: Real-time stage tracking in `!status` and granular completion/upload notifications in the chat room.
 - [x] Async Execution: Moved CPU-intensive rendering and potentially slow network calls (ntfy) to background threads to keep the Matrix bot responsive.
+- [x] Concurrency Protection: Prevents multiple simultaneous video production runs with user-friendly "busy" notifications via Matrix and ntfy.
 
 ## Future Ideas
 - [ ] Add E2EE support for Matrix (requires persistent storage for keys).

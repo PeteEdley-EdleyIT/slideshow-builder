@@ -43,6 +43,23 @@ async def run_automation(matrix=None):
     config = Config()
     health_mgr.config = config # Sync config for ntfy
     
+    # Check if a job is already running
+    if health_mgr.current_stage is not None:
+        msg = "⚠️ A video production job is already in progress. Please try again later."
+        print(f"ABORT: {msg}")
+        
+        if matrix and matrix.is_configured():
+            await matrix.send_message(msg)
+            
+        asyncio.create_task(asyncio.to_thread(
+            health_mgr.send_ntfy, 
+            msg, 
+            title="Production Skipped",
+            priority="default",
+            tags=["warning", "stopwatch"]
+        ))
+        return
+    
     # Initialize Matrix if not provided
     created_matrix = False
     if not matrix:
@@ -408,11 +425,11 @@ async def main():
     # Schedule Video Production
     try:
         trigger = CronTrigger.from_crontab(config.cron_schedule)
-        scheduler.add_job(run_automation, trigger, args=[matrix], id="slideshow_job")
+        scheduler.add_job(run_automation, trigger, args=[matrix], id="slideshow_job", max_instances=2)
         print(f"Scheduled slideshow job: {config.cron_schedule}")
     except Exception as e:
         print(f"Failed to schedule job '{config.cron_schedule}': {e}. Using default Friday 1AM.")
-        scheduler.add_job(run_automation, CronTrigger.from_crontab("0 1 * * 5"), args=[matrix])
+        scheduler.add_job(run_automation, CronTrigger.from_crontab("0 1 * * 5"), args=[matrix], max_instances=2)
 
     # Schedule Heartbeat
     if config.enable_heartbeat:

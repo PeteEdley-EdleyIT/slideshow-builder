@@ -35,15 +35,3 @@ This document outlines potential enhancements for the Video Slideshow Automation
     *   **Benefit:** Useful for branding or copyright purposes.
 
 ## Bot & Automation Improvements:
-
-8.  **Queue Management for Bot Commands:**
-    *   **Description:** If multiple `!rebuild` commands are issued, implement a queue system to process them sequentially, preventing resource contention.
-    *   **Benefit:** Improves robustness and user experience for the interactive bot.
-
-9.  **Progress Updates via Matrix:**
-    *   **Description:** Send periodic updates to the Matrix room during video generation (e.g., "25% complete," "Processing image 5 of 20").
-    *   **Benefit:** Provides better feedback to the user, especially for long-running tasks.
-
-10. **Advanced Configuration via Matrix:**
-    *   **Description:** Expand the `!config` command to allow viewing and modifying various slideshow parameters (e.g., slide duration, music folder, output resolution) directly through Matrix.
-    *   **Benefit:** Centralized control and easier management without needing to access environment variables or files.
