@@ -73,14 +73,14 @@ class MusicAttributionOverlay:
         self.font_size = font_size
         self.color = color
 
-    def create_attribution_clip(self, attribution_text, duration, position='bottom-left'):
+    def create_attribution_clip(self, attribution_text, duration, position='bottom-right'):
         """
         Creates an attribution overlay for a specific duration.
         
         Args:
             attribution_text (str): The text to display (Creator, Artist, Title, Link).
             duration (float): How long the overlay should last.
-            position (str): Positioning hint. Defaults to 'bottom-left'.
+            position (str): Positioning hint. Defaults to 'bottom-right'.
 
         Returns:
             VideoClip: A moviepy clip with the attribution.
@@ -90,8 +90,6 @@ class MusicAttributionOverlay:
         
         # Max width is 1/3 of the screen
         max_w = self.target_size[0] // 3
-        # Max height is 1/5 of the screen
-        max_h = self.target_size[1] // 5
         
         # Create the text clip
         txt_clip = TextClip(
@@ -101,7 +99,7 @@ class MusicAttributionOverlay:
             font=self.font,
             method='caption',
             size=(max_w - 40, None), # Let height be dynamic but bounded
-            align='West'
+            align='East' if 'right' in position else 'West'
         ).set_duration(duration)
         
         # Get actual text dimensions
@@ -117,8 +115,13 @@ class MusicAttributionOverlay:
             x = 50
             y = self.target_size[1] - box_h - 50
             pos = (x, y)
+        elif position == 'bottom-right':
+            # Horizontal: 50 pixels from right. Vertical: 50 pixels from bottom.
+            x = self.target_size[0] - box_w - 50
+            y = self.target_size[1] - box_h - 50
+            pos = (x, y)
         else:
-            # Fallback to bottom-right
+            # Fallback
             pos = ("right", "bottom")
             
         # Composite them
