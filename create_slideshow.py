@@ -176,8 +176,8 @@ async def handle_matrix_message(matrix, room, event):
         
     elif command == "!status":
         stats = health_mgr.get_status_summary()
-        status_msg = ui.format_status(stats, config)
-        await matrix.send_message(status_msg)
+        plain, html = ui.format_status(stats, config)
+        await matrix.send_message(plain, html_message=html)
     
     elif command.startswith("!set "):
         # Parse: !set KEY VALUE
@@ -237,10 +237,10 @@ async def handle_matrix_message(matrix, room, event):
         overrides = settings.list_all()
         
         if not overrides:
-            msg = "📋 **Current Configuration**\n\nNo runtime overrides active.\nAll settings are using .env defaults.\n\nUse !set KEY VALUE to override a setting."
+            msg = "📋 Current Configuration\n\nNo runtime overrides active.\nAll settings are using .env defaults.\n\nUse !set KEY VALUE to override a setting."
         else:
             override_list = "\n".join([f"• {k} = {v}" for k, v in overrides.items()])
-            msg = f"📋 **Current Configuration Overrides**\n\n{override_list}\n\nUse !defaults to reset all to .env values."
+            msg = f"📋 Current Configuration Overrides\n\n{override_list}\n\nUse !defaults to reset all to .env values."
         
         await matrix.send_message(msg)
     

@@ -19,28 +19,42 @@ class BotInterface:
     def format_status(stats, config):
         """
         Formats the !status response.
+        Returns (plain_text, html_message)
         """
+        # Plain text version (no **)
         status_msg = (
-            "🤖 **Slideshow Bot Status**\n"
-            f"🏷️ **Version**: {__version__}\n"
-            f"⏱️ **Uptime**: {stats['uptime']}\n"
-            f"✅ **Last Success**: {stats['last_success']}\n"
-            f"💓 **Heartbeat Active**: {'Yes' if stats['heartbeat_active'] else 'No'}\n"
+            "🤖 Slideshow Bot Status\n"
+            f"🏷️ Version: {__version__}\n"
+            f"⏱️ Uptime: {stats['uptime']}\n"
+            f"✅ Last Success: {stats['last_success']}\n"
+            f"💓 Heartbeat Active: {'Yes' if stats['heartbeat_active'] else 'No'}\n"
+        )
+        
+        # HTML version (proper bolding)
+        html_msg = (
+            "🤖 <b>Slideshow Bot Status</b><br/>"
+            f"🏷️ <b>Version</b>: {__version__}<br/>"
+            f"⏱️ <b>Uptime</b>: {stats['uptime']}<br/>"
+            f"✅ <b>Last Success</b>: {stats['last_success']}<br/>"
+            f"💓 <b>Heartbeat Active</b>: {'Yes' if stats['heartbeat_active'] else 'No'}<br/>"
         )
         
         # Quick Nextcloud Connectivity Check
         if config.nc_url and config.nc_user:
+            nc_status = "Connection Failed"
             try:
-                # We use a short timeout for the check
                 NextcloudClient(
                     config.nc_url, 
                     config.nc_user, 
                     config.nc_pass, 
                     verify_ssl=not config.nc_insecure
                 )
-                status_msg += "☁️ **Nextcloud**: Connected\n"
+                nc_status = "Connected"
             except Exception:
-                status_msg += "☁️ **Nextcloud**: ❌ Connection Failed\n"
+                nc_status = "❌ Connection Failed"
+            
+            status_msg += f"☁️ Nextcloud: {nc_status}\n"
+            html_msg += f"☁️ <b>Nextcloud</b>: {nc_status}<br/>"
 
         # Show active task if something is running
         if stats.get('active_stage'):
@@ -48,16 +62,25 @@ class BotInterface:
             progress = stats.get('progress', 0)
             start_time = stats.get('job_start_time', 'Unknown')
             
-            status_msg += f"\n🚀 **Current Activity**: {stats['active_stage']}\n"
-            status_msg += f"📅 **Started At**: {start_time}\n"
-            status_msg += f"📝 **Task**: {task}\n"
+            status_msg += (
+                f"\n🚀 Current Activity: {stats['active_stage']}\n"
+                f"📅 Started At: {start_time}\n"
+                f"📝 Task: {task}\n"
+            )
+            
+            html_msg += (
+                f"<br/>🚀 <b>Current Activity</b>: {stats['active_stage']}<br/>"
+                f"📅 <b>Started At</b>: {start_time}<br/>"
+                f"📝 <b>Task</b>: {task}<br/>"
+            )
+            
             if progress > 0:
-                # Simple progress bar
                 bars = progress // 10
                 progress_bar = "▓" * bars + "░" * (10 - bars)
-                status_msg += f"📊 **Progress**: [{progress_bar}] {progress}%\n"
+                status_msg += f"📊 Progress: [{progress_bar}] {progress}%\n"
+                html_msg += f"📊 <b>Progress</b>: [{progress_bar}] {progress}%<br/>"
         
-        return status_msg
+        return status_msg, html_msg
 
     @staticmethod
     def format_full_config(config):
@@ -67,13 +90,13 @@ class BotInterface:
         settings_mgr = get_settings_manager()
         overrides = settings_mgr.list_all()
         
-        lines = ["📋 **Full Configuration Status**\n"]
+        lines = ["📋 Full Configuration Status\n"]
         html_lines = ["<h3>📋 Full Configuration Status</h3>"]
         
         for category, keys in config.CONFIG_GROUPS.items():
-            lines.append(f"\n{category}")
-            cat_name = category.replace("**", "")
-            html_lines.append(f"<h4>{cat_name}</h4>")
+            cat_clean = category.replace("**", "")
+            lines.append(f"\n{cat_clean}")
+            html_lines.append(f"<h4>{cat_clean}</h4>")
             
             for key in keys:
                 if key is None:
@@ -110,24 +133,25 @@ class BotInterface:
         """
         # Build Plain Text Help
         help_text = (
-            "🤖 **Slideshow Bot Help**\n\n"
-            "**🚀 Automation:**\n"
+            "🤖 Slideshow Bot Help\n\n"
+            "🚀 Automation:\n"
             "• `!rebuild` - Trigger a manual video generation\n"
             "• `!status` - Check the bot's health and uptime\n\n"
-            "**⚙️ Configuration:**\n"
+            "⚙️ Configuration:\n"
             "• `!set KEY VALUE` - Override a setting\n"
             "• `!get KEY` - View current value of a setting\n"
             "• `!get all` - View all settings and status\n"
             "• `!config` - List active overrides\n"
             "• `!defaults` - Reset all to .env defaults\n\n"
-            "**❓ General:**\n"
+            "❓ General:\n"
             "• `!help` - Show this message\n\n"
-            "**📝 Configurable Settings:**\n"
+            "📝 Configurable Settings:\n"
         )
         
         for category, keys in config.CONFIG_GROUPS.items():
             valid_keys = [k for k in keys if k is not None]
-            help_text += f"\n{category}\n"
+            cat_clean = category.replace("**", "")
+            help_text += f"\n{cat_clean}\n"
             help_text += ", ".join([f"`{k}`" for k in valid_keys]) + "\n"
 
         # Build HTML Help
