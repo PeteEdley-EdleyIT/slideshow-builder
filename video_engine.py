@@ -125,7 +125,7 @@ class VideoEngine:
             # 1. Source Images
             if self.health_mgr:
                 self.health_mgr.update_status("Sourcing", "Retrieving images")
-            image_paths = self._source_images(temp_dirs)
+            image_paths = await asyncio.to_thread(self._source_images, temp_dirs)
 
             included_slides = [os.path.basename(p) for p in image_paths]
 
@@ -133,8 +133,8 @@ class VideoEngine:
             if self.config.append_video_path:
                 if self.health_mgr:
                     self.health_mgr.update_status("Sourcing", f"Downloading {os.path.basename(self.config.append_video_path)}")
-                local_video_path, fps_from_clip = self._prepare_append_video(temp_dirs)
-                append_video_clip = self.generator.load_append_video(local_video_path)
+                local_video_path, fps_from_clip = await asyncio.to_thread(self._prepare_append_video, temp_dirs)
+                append_video_clip = await asyncio.to_thread(self.generator.load_append_video, local_video_path)
                 
                 if append_video_clip and append_video_clip.fps:
                     # Sync project FPS with the appended video
@@ -152,13 +152,15 @@ class VideoEngine:
             if slideshow_target_duration > 0:
                 if self.health_mgr:
                     self.health_mgr.update_status("Generating", "Creating slideshow video")
-                slideshow_video = self.generator.create_video(
+                slideshow_video = await asyncio.to_thread(
+                    self.generator.create_video, 
                     image_paths, self.config.image_duration, slideshow_target_duration, fps
                 )
                 
                 if self.health_mgr:
                     self.health_mgr.update_status("Generating", "Preparing background music")
-                slideshow_audio = self.audio_mgr.prepare_background_music(
+                slideshow_audio = await asyncio.to_thread(
+                    self.audio_mgr.prepare_background_music,
                     self.config.music_folder, self.config.music_source, slideshow_target_duration, temp_dirs
                 )
                 
@@ -175,7 +177,8 @@ class VideoEngine:
                 timer_start_at = max(0, final_video.duration - (self.config.timer_minutes * 60))
                 print(f"Timer enabled: Overlaying countdown starting at {timer_start_at}s (last {self.config.timer_minutes} mins)")
                 
-                final_video = self.generator.apply_timer_overlay(
+                final_video = await asyncio.to_thread(
+                    self.generator.apply_timer_overlay,
                     final_video, 
                     start_time_offset=timer_start_at, 
                     total_duration=final_video.duration,
