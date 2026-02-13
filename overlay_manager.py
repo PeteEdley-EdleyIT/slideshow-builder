@@ -99,12 +99,12 @@ class MusicAttributionOverlay:
             font=self.font,
             method='caption',
             size=(max_w - 40, None), # Let height be dynamic but bounded
-            align='East' if 'right' in position else 'West'
+            align='West'
         ).set_duration(duration)
         
         # Get actual text dimensions
         txt_w, txt_h = txt_clip.size
-        box_w, box_h = txt_w + 40, txt_h + 30
+        box_w, box_h = int((txt_w + 40) * 1.1), txt_h + 30
         
         # Add a semi-transparent box for readability
         bg_clip = ColorClip(size=(box_w, box_h), color=(0, 0, 0), ismask=False).set_opacity(0.6).set_duration(duration)
