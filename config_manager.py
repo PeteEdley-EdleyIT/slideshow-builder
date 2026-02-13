@@ -115,7 +115,7 @@ class Config:
         self.nc_pass = get_env_var("NEXTCLOUD_PASSWORD")
         self.nc_image_path = get_env_var("NEXTCLOUD_IMAGE_PATH") # Deprecated, use nextcloud_image_path
         self.nextcloud_image_path = self.nc_image_path
-        self.nc_upload_path = get_env_var("UPLOAD_NEXTCLOUD_PATH") # Deprecated, use upload_nextcloud_path
+        self.nc_upload_path = get_env_var("NEXTCLOUD_UPLOAD_PATH") # Deprecated, use upload_nextcloud_path
         self.upload_nextcloud_path = self.nc_upload_path
         self.nc_insecure = get_env_bool("NEXTCLOUD_INSECURE_SSL", False)
         

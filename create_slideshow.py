@@ -149,24 +149,30 @@ async def handle_matrix_message(matrix, room, event):
     command = event.body.strip()
     print(f"Processing command: '{command}' from {event.sender}")
     
-    # List of configurable settings
-    CONFIGURABLE_SETTINGS = [
-        "IMAGE_DURATION",
-        "TARGET_VIDEO_DURATION",
-        "CRON_SCHEDULE",
-        "IMAGE_SOURCE",
-        "MUSIC_SOURCE",
-        "NEXTCLOUD_IMAGE_PATH",
-        "UPLOAD_NEXTCLOUD_PATH",
-        "APPEND_VIDEO_PATH",
-        "APPEND_VIDEO_SOURCE",
-        "ENABLE_HEARTBEAT",
-        "NTFY_TOPIC",
-        "ENABLE_NTFY",
-        "ENABLE_TIMER",
-        "TIMER_MINUTES",
-        "TIMER_POSITION"
-    ]
+    # Shared configuration grouping for !get all and !help
+    GROUPS = {
+        "⚙️ **General**": ["IMAGE_DURATION", "TARGET_VIDEO_DURATION", "CRON_SCHEDULE"],
+        "☁️ **Nextcloud**": [
+            "NEXTCLOUD_UPLOAD_PATH", 
+            None,
+            "IMAGE_SOURCE", 
+            "NEXTCLOUD_IMAGE_PATH", 
+            None,
+            "MUSIC_SOURCE", 
+            "MUSIC_FOLDER", 
+            None,
+            "APPEND_VIDEO_SOURCE", 
+            "APPEND_VIDEO_PATH"
+        ],
+        "⏱️ **Timer Settings**": ["ENABLE_TIMER", "TIMER_MINUTES", "TIMER_POSITION"],
+        "💓 **Heartbeat**": ["ENABLE_HEARTBEAT"],
+        "🔔 **NTFY**": ["ENABLE_NTFY", "NTFY_TOPIC"]
+    }
+    
+    # Flatten GROUPS for validation and simple lists, filtering out None
+    CONFIGURABLE_SETTINGS = []
+    for keys in GROUPS.values():
+        CONFIGURABLE_SETTINGS.extend([k for k in keys if k is not None])
     
     if command == "!rebuild":
         await matrix.send_message("🚀 Starting manual rebuild...")
@@ -228,7 +234,7 @@ async def handle_matrix_message(matrix, room, event):
         await matrix.send_message(f"✅ Set {key} = {value}\n\n⚠️ Changes will take effect on next rebuild.")
     
     elif command == "!get all":
-        # Show all configurable settings and their current values
+        # Show all configurable settings grouped by category
         config = Config()
         settings = get_settings_manager()
         overrides = settings.list_all()
@@ -236,22 +242,32 @@ async def handle_matrix_message(matrix, room, event):
         lines = ["📋 **Full Configuration Status**\n"]
         html_lines = ["<h3>📋 Full Configuration Status</h3>"]
         
-        for key in CONFIGURABLE_SETTINGS:
-            value = getattr(config, key.lower(), "Not set")
-            is_override = key in overrides
-            marker = "🔹" if is_override else "▫️"
-            status = "(Override)" if is_override else "(Default)"
+        for category, keys in GROUPS.items():
+            lines.append(f"\n{category}")
+            cat_name = category.replace("**", "")
+            html_lines.append(f"<h4>{cat_name}</h4>")
             
-            # Plain text version
-            lines.append(f"{marker} **{key}**: {value} {status}")
-            
-            # HTML version with color-coded variables
-            color = "blue" if is_override else "green"
-            html_lines.append(
-                f"{marker} <font color='{color}'><b>{key}</b></font>: {value} <i>{status}</i><br/>"
-            )
+            for key in keys:
+                if key is None:
+                    lines.append("")
+                    html_lines.append("<br/>")
+                    continue
+                    
+                value = getattr(config, key.lower(), "Not set")
+                is_override = key in overrides
+                marker = "🔹" if is_override else "▫️"
+                status = "(Override)" if is_override else "(Default)"
+                
+                # Plain text version
+                lines.append(f"{marker} {key}: {value} {status}")
+                
+                # HTML version
+                color = "blue" if is_override else "green"
+                html_lines.append(
+                    f"{marker} <font color='{color}'><b>{key}</b></font>: {value} <i>{status}</i><br/>"
+                )
         
-        lines.append("\n🔹 = Runtime Override active")
+        lines.append("\n\n🔹 = Runtime Override active")
         lines.append("▫️ = Using .env/calculated default")
         
         html_lines.append("<p><br/>🔹 = <font color='blue'>Runtime Override active</font><br/>")
@@ -311,7 +327,7 @@ async def handle_matrix_message(matrix, room, event):
         await matrix.send_message(original_message)
         
     elif command == "!help":
-        # Categories and commands with emojis
+        # Build Plain Text Help
         help_text = (
             "🤖 **Slideshow Bot Help**\n\n"
             "**🚀 Automation:**\n"
@@ -325,18 +341,28 @@ async def handle_matrix_message(matrix, room, event):
             "• `!defaults` - Reset all to .env defaults\n\n"
             "**❓ General:**\n"
             "• `!help` - Show this message\n\n"
-            "**📝 Configurable Settings:**\n" + 
-            ", ".join(CONFIGURABLE_SETTINGS)
+            "**📝 Configurable Settings:**\n"
         )
         
-        # HTML version with 2-column table for settings
-        settings_html = "<table style='width:100%'>"
-        for i in range(0, len(CONFIGURABLE_SETTINGS), 2):
-            col1 = CONFIGURABLE_SETTINGS[i]
-            col2 = CONFIGURABLE_SETTINGS[i+1] if i+1 < len(CONFIGURABLE_SETTINGS) else ""
-            settings_html += f"<tr><td>• <code>{col1}</code></td><td>{f'• <code>{col2}</code>' if col2 else ''}</td></tr>"
-        settings_html += "</table>"
-        
+        for category, keys in GROUPS.items():
+            valid_keys = [k for k in keys if k is not None]
+            help_text += f"\n{category}\n"
+            # Plain text settings list (comma separated for help)
+            help_text += ", ".join([f"`{k}`" for k in valid_keys]) + "\n"
+
+        # Build HTML Help
+        settings_html = ""
+        for category, keys in GROUPS.items():
+            valid_keys = [k for k in keys if k is not None]
+            cat_name = category.replace("**", "")
+            settings_html += f"<h4>{cat_name}</h4>"
+            settings_html += "<table style='width:100%'>"
+            for i in range(0, len(valid_keys), 2):
+                col1 = valid_keys[i]
+                col2 = valid_keys[i+1] if i+1 < len(valid_keys) else ""
+                settings_html += f"<tr><td><code>{col1}</code></td><td>{f'<code>{col2}</code>' if col2 else ''}</td></tr>"
+            settings_html += "</table>"
+
         html_help = (
             "<h3>🤖 Slideshow Bot Help</h3>"
             "<h4>🚀 Automation</h4>"

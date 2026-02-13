@@ -231,7 +231,7 @@ All aspects of the slideshow automation are configured via environment variables
 | `NEXTCLOUD_USERNAME`     | Your Nextcloud username for authentication. Required for Nextcloud integration.                         | (None)          |
 | `NEXTCLOUD_PASSWORD`     | Your Nextcloud password for authentication. Required for Nextcloud integration.                         | (None)          |
 | `NEXTCLOUD_IMAGE_PATH`   | The path within your Nextcloud instance where source image files are located (e.g., `Photos/Slideshow/`). | (None)          |
-| `UPLOAD_NEXTCLOUD_PATH`  | The path within your Nextcloud instance where the final generated video should be uploaded (e.g., `Videos/Generated/`). | (None)          |
+| `NEXTCLOUD_UPLOAD_PATH` | The path within your Nextcloud instance where the final generated video should be uploaded (e.g., `Videos/Generated/`). | (None)          |
 | `NEXTCLOUD_INSECURE_SSL` | Set to `true` if your Nextcloud instance uses a self-signed or invalid SSL certificate and you wish to proceed anyway. Use with extreme caution. | `false`         |
 | `APPEND_VIDEO_PATH`      | The path to an additional video file to be appended after the main slideshow. Can be a local path or a Nextcloud path (if `APPEND_VIDEO_SOURCE` is `nextcloud`). | (None)          |
 | `APPEND_VIDEO_SOURCE`    | Specifies where the `APPEND_VIDEO_PATH` refers to: `local` for a local file, or `nextcloud` for a file on your Nextcloud. | `local`         |
