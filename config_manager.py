@@ -149,3 +149,29 @@ class Config:
         self.enable_timer = get_env_bool("ENABLE_TIMER", False)
         self.timer_minutes = get_env_int("TIMER_MINUTES", 5)
         self.timer_position = get_env_var("TIMER_POSITION", "auto")
+
+        # --- Metadata for Bot UI ---
+        # Logical grouping of settings for !help and !get all
+        self.CONFIG_GROUPS = {
+            "⚙️ **General**": ["IMAGE_DURATION", "TARGET_VIDEO_DURATION", "CRON_SCHEDULE"],
+            "☁️ **Nextcloud**": [
+                "NEXTCLOUD_UPLOAD_PATH", 
+                None,
+                "IMAGE_SOURCE", 
+                "NEXTCLOUD_IMAGE_PATH", 
+                None,
+                "MUSIC_SOURCE", 
+                "MUSIC_FOLDER", 
+                None,
+                "APPEND_VIDEO_SOURCE", 
+                "APPEND_VIDEO_PATH"
+            ],
+            "⏱️ **Timer Settings**": ["ENABLE_TIMER", "TIMER_MINUTES", "TIMER_POSITION"],
+            "💓 **Heartbeat**": ["ENABLE_HEARTBEAT"],
+            "🔔 **NTFY**": ["ENABLE_NTFY", "NTFY_TOPIC"]
+        }
+        
+        # Flattened list for validation, filtering out spacers (None)
+        self.CONFIGURABLE_SETTINGS = []
+        for keys in self.CONFIG_GROUPS.values():
+            self.CONFIGURABLE_SETTINGS.extend([k for k in keys if k is not None])
