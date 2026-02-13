@@ -1,6 +1,6 @@
 # Video Slideshow Automation
 
-This project is going to take a folder full of images in a jpeg format, and cobine them together into a video slide show.
+This project is going to take a folder full of images (JPEG, PNG, WebP, BMP), and combine them together into a video slideshow.
 
 Here are a list of required features to work through one by one we will not be moving on to the next feature until the current on is complete and tested.
 
@@ -87,12 +87,12 @@ Use these commands to monitor and manage the running automation:
 1.  **Tag the image (latest and versioned):**
     ```bash
     podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:latest
-    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.0
+    podman tag localhost/slideshow-builder:latest docker.io/pedley/slideshow-builder:2.4.4
     ```
 2.  **Push the image:**
     ```bash
     podman push docker.io/pedley/slideshow-builder:latest
-    podman push docker.io/pedley/slideshow-builder:2.4.0
+    podman push docker.io/pedley/slideshow-builder:2.4.4
     ```
 
 # Features

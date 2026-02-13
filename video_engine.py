@@ -210,18 +210,26 @@ class VideoEngine:
 
     def _source_images(self, temp_dirs):
         """Internal helper to retrieve image paths from local or Nextcloud."""
+        extensions = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
+        
         if self.config.image_source == "nextcloud" and self.nc_client and self.config.nextcloud_image_path:
-            print("Retrieving images from Nextcloud...")
+            print(f"Retrieving images from Nextcloud: {extensions}")
             image_paths, temp_img_dir = self.nc_client.list_and_download_files(
-                self.config.nextcloud_image_path, allowed_extensions=('.jpg', '.jpeg')
+                self.config.nextcloud_image_path, allowed_extensions=extensions
             )
             if temp_img_dir:
                 temp_dirs.append(temp_img_dir)
             return image_paths
         else:
             print(f"Retrieving images from local folder: {self.config.image_folder}")
-            image_paths = glob.glob(os.path.join(self.config.image_folder, "*.jpg"))
-            image_paths.extend(glob.glob(os.path.join(self.config.image_folder, "*.jpeg")))
+            image_paths = []
+            for ext in extensions:
+                image_paths.extend(glob.glob(os.path.join(self.config.image_folder, f"*{ext}")))
+                # Also handle uppercase extensions for local files
+                image_paths.extend(glob.glob(os.path.join(self.config.image_folder, f"*{ext.upper()}")))
+            
+            # Remove duplicates if any (e.g. .JPG vs .jpg if OS is case-insensitive but glob isn't)
+            image_paths = list(set(image_paths))
             image_paths.sort(key=sort_key)
             return image_paths
 

@@ -33,5 +33,3 @@ This document outlines potential enhancements for the Video Slideshow Automation
 7.  **Watermarking/Branding:**
     *   **Description:** Option to add a custom watermark or logo to the generated video.
     *   **Benefit:** Useful for branding or copyright purposes.
-
-## Bot & Automation Improvements:

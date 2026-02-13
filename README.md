@@ -4,7 +4,7 @@ This project automatically creates video slideshows from image and music files, 
 
 ## Features
 
-*   **Automated Video Creation:** Generates video slideshows from JPEG images on a schedule.
+*   **Automated Video Creation:** Generates video slideshows from various image formats (JPEG, PNG, WebP, BMP) on a schedule.
 *   **Flexible Media Sourcing:** Images and background music can be pulled from either local folders or a Nextcloud instance.
 *   **Customizable Video Output:**
     *   Control how long each image is displayed.
