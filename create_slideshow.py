@@ -221,6 +221,27 @@ async def handle_matrix_message(matrix, room, event):
         # Get the actual value being used
         value = getattr(config, key.lower(), "Not set")
         
+        if key.upper() == "CRON_SCHEDULE" and value != "Not set":
+            try:
+                import cron_descriptor
+                import croniter
+                from datetime import datetime
+                
+                desc = cron_descriptor.get_description(value)
+                
+                # Calculate next run time
+                now = datetime.now()
+                iter = croniter.croniter(value, now)
+                next_run = iter.get_next(datetime)
+                
+                # Format as Next Run: YYYY-MM-DD HH:MM:SS
+                time_str = next_run.strftime('%Y-%m-%d %H:%M:%S')
+                
+                value = f"{value} ({desc}) [Next Run: {time_str}]"
+            except Exception as e:
+                print(f"Error parsing cron for display: {e}")
+                pass
+        
         settings = get_settings_manager()
         db_value = settings.get(key)
         

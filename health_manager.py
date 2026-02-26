@@ -117,9 +117,25 @@ class HealthManager:
             dict: A dictionary containing uptime, last success, and last heartbeat status.
         """
         uptime_seconds = int(time.time() - self.start_time)
+        
+        # Calculate next run time
+        next_run_str = "Unknown"
+        if self.config and getattr(self.config, 'cron_schedule', None):
+            try:
+                import croniter
+                from datetime import datetime
+                now = datetime.now()
+                iter = croniter.croniter(self.config.cron_schedule, now)
+                next_run = iter.get_next(datetime)
+                next_run_str = next_run.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception as e:
+                print(f"Error calculating next run time: {e}")
+                pass
+        
         summary = {
             "uptime": f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
             "last_success": time.ctime(self.last_success_time) if self.last_success_time else "Never",
+            "next_run": next_run_str,
             "heartbeat_active": self.last_heartbeat_time is not None,
             "active_stage": self.current_stage,
             "active_task": self.current_task,

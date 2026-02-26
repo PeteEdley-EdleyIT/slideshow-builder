@@ -31,6 +31,8 @@
             cachetools
             atomicwrites
             peewee
+            cron-descriptor
+            croniter
           ]
         );
 

@@ -26,6 +26,7 @@ class BotInterface:
             "🤖 Slideshow Bot Status\n"
             f"🏷️ Version: {__version__}\n"
             f"⏱️ Uptime: {stats['uptime']}\n"
+            f"📅 Next Run: {stats['next_run']}\n"
             f"✅ Last Success: {stats['last_success']}\n"
             f"💓 Heartbeat Active: {'Yes' if stats['heartbeat_active'] else 'No'}\n"
         )
@@ -35,6 +36,7 @@ class BotInterface:
             "🤖 <b>Slideshow Bot Status</b><br/>"
             f"🏷️ <b>Version</b>: {__version__}<br/>"
             f"⏱️ <b>Uptime</b>: {stats['uptime']}<br/>"
+            f"📅 <b>Next Run</b>: {stats['next_run']}<br/>"
             f"✅ <b>Last Success</b>: {stats['last_success']}<br/>"
             f"💓 <b>Heartbeat Active</b>: {'Yes' if stats['heartbeat_active'] else 'No'}<br/>"
         )
@@ -108,6 +110,28 @@ class BotInterface:
                 is_override = key in overrides
                 marker = "🔹" if is_override else "▫️"
                 status = "(Override)" if is_override else "(Default)"
+                
+                if key.upper() == "CRON_SCHEDULE" and value != "Not set":
+                    try:
+                        import cron_descriptor
+                        import croniter
+                        from datetime import datetime
+                        
+                        desc = cron_descriptor.get_description(value)
+                        
+                        # Calculate next run time
+                        now = datetime.now()
+                        iter = croniter.croniter(value, now)
+                        next_run = iter.get_next(datetime)
+                        
+                        # Format as Next Run: YYYY-MM-DD HH:MM:SS
+                        time_str = next_run.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        value = f"{value} ({desc}) [Next Run: {time_str}]"
+                    except Exception as e:
+                        print(f"Error parsing cron for display: {e}")
+                        pass
+                
                 
                 # Plain text version
                 lines.append(f"{marker} {key}: {value} {status}")
