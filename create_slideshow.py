@@ -162,7 +162,47 @@ async def run_automation(matrix=None):
             os.remove(temp_output_file)
 
 
-async def handle_matrix_message(matrix, room, event):
+def get_apscheduler_trigger(cron_str):
+    """
+    Creates an APScheduler CronTrigger from a standard crontab string.
+    
+    Translates the 5th field (weekday) from crontab standard (0,7=Sun, 1=Mon, ..., 6=Sat)
+    to APScheduler standard (0=Mon, 1=Tue, ..., 6=Sun).
+    """
+    parts = cron_str.split()
+    if len(parts) >= 5:
+        weekday = parts[4]
+        
+        # Mapping: Crontab (0-7, 0/7=Sun) -> APScheduler (0-6, 0=Mon, 6=Sun)
+        # Translation table: 
+        # 1 -> 0 (Mon)
+        # 2 -> 1 (Tue)
+        # 3 -> 2 (Wed)
+        # 4 -> 3 (Thu)
+        # 5 -> 4 (Fri)
+        # 6 -> 5 (Sat)
+        # 0, 7 -> 6 (Sun)
+        
+        mapping = {
+            "1": "0", "2": "1", "3": "2", "4": "3", "5": "4", "6": "5", "0": "6", "7": "6",
+            "MON": "0", "TUE": "1", "WED": "2", "THU": "3", "FRI": "4", "SAT": "5", "SUN": "6"
+        }
+        
+        if weekday.upper() in mapping:
+            parts[4] = mapping[weekday.upper()]
+        elif "-" in weekday:
+            # Handle simple ranges like 1-5
+            r_parts = weekday.split("-")
+            if len(r_parts) == 2 and r_parts[0] in mapping and r_parts[1] in mapping:
+                parts[4] = f"{mapping[r_parts[0].upper()]}-{mapping[r_parts[1].upper()]}"
+        
+        resolved_cron = " ".join(parts)
+        return CronTrigger.from_crontab(resolved_cron)
+    
+    return CronTrigger.from_crontab(cron_str)
+
+
+async def handle_matrix_message(matrix, room, event, scheduler=None):
     """Callback for handling Matrix commands."""
     command = event.body.strip()
     print(f"Processing command: '{command}' from {event.sender}")
@@ -198,7 +238,23 @@ async def handle_matrix_message(matrix, room, event):
         
         settings = get_settings_manager()
         settings.set(key, value)
-        await matrix.send_message(f"✅ Set {key} = {value}\n\n⚠️ Changes will take effect on next rebuild.")
+        
+        # Immediate Rescheduling for Cron
+        reschedule_msg = ""
+        if key == "CRON_SCHEDULE" and scheduler:
+            try:
+                trigger = get_apscheduler_trigger(value)
+                scheduler.reschedule_job("slideshow_job", trigger=trigger, misfire_grace_time=3600)
+                
+                # Log and inform user about next fire time
+                job = scheduler.get_job("slideshow_job")
+                next_fire = getattr(job, 'next_run_time', "Unknown")
+                print(f"Schedule updated! Next run at: {next_fire}")
+                reschedule_msg = f"\n🚀 Schedule updated! Next run at: {next_fire} (applied immediately)"
+            except Exception as e:
+                reschedule_msg = f"\n❌ Failed to reschedule: {e}"
+
+        await matrix.send_message(f"✅ Set {key} = {value}{reschedule_msg}")
     
     elif command == "!get all":
         # Show all configurable settings grouped by category
@@ -271,9 +327,21 @@ async def handle_matrix_message(matrix, room, event):
         count = settings.reset_all()
         original_message = (
             f"♻️ Reset {count} configuration override(s).\n"
-            f"All settings now use .env defaults.\n\n"
-            f"⚠️ Changes will take effect on next rebuild."
+            f"All settings now use .env defaults."
         )
+        
+        # Reset cron if needed
+        if scheduler:
+            try:
+                trigger = get_apscheduler_trigger(config.cron_schedule)
+                scheduler.reschedule_job("slideshow_job", trigger=trigger, misfire_grace_time=3600)
+                
+                job = scheduler.get_job("slideshow_job")
+                next_fire = getattr(job, 'next_run_time', "Unknown")
+                original_message += f"\n🚀 Schedule reset! Next run at: {next_fire} (applied immediately)"
+            except Exception:
+                pass
+
         await matrix.send_message(original_message)
         
     elif command == "!help":
@@ -296,26 +364,51 @@ async def main():
     print(f"Starting Matrix bot daemon with schedule: {config.cron_schedule}")
     
     scheduler = AsyncIOScheduler()
+    scheduler.start()
     
     # Schedule Video Production
     try:
-        trigger = CronTrigger.from_crontab(config.cron_schedule)
-        scheduler.add_job(run_automation, trigger, args=[matrix], id="slideshow_job", max_instances=2)
-        print(f"Scheduled slideshow job: {config.cron_schedule}")
+        trigger = get_apscheduler_trigger(config.cron_schedule)
+        scheduler.add_job(
+            run_automation, 
+            trigger, 
+            args=[matrix], 
+            id="slideshow_job", 
+            max_instances=2, 
+            misfire_grace_time=3600,
+            replace_existing=True
+        )
+        
+        job = scheduler.get_job("slideshow_job")
+        next_fire = getattr(job, 'next_run_time', "Unknown")
+        print(f"Scheduled slideshow job: {config.cron_schedule} (Next run: {next_fire})")
     except Exception as e:
         print(f"Failed to schedule job '{config.cron_schedule}': {e}. Using default Friday 1AM.")
-        scheduler.add_job(run_automation, CronTrigger.from_crontab("0 1 * * 5"), args=[matrix], max_instances=2)
+        fallback_trigger = get_apscheduler_trigger("0 1 * * 5")
+        scheduler.add_job(
+            run_automation, 
+            fallback_trigger, 
+            args=[matrix], 
+            id="slideshow_job", 
+            max_instances=2, 
+            misfire_grace_time=3600,
+            replace_existing=True
+        )
 
     # Schedule Heartbeat
     if config.enable_heartbeat:
         print("Enabling heartbeat mechanism...")
-        scheduler.add_job(health_mgr.update_heartbeat, 'interval', minutes=1, id="heartbeat_job")
+        scheduler.add_job(
+            health_mgr.update_heartbeat, 
+            'interval', 
+            minutes=1, 
+            id="heartbeat_job",
+            replace_existing=True
+        )
         asyncio.create_task(health_mgr.update_heartbeat())
 
-    scheduler.start()
-
     if matrix.is_configured():
-        matrix.add_message_callback(lambda room, event: handle_matrix_message(matrix, room, event))
+        matrix.add_message_callback(lambda room, event: handle_matrix_message(matrix, room, event, scheduler=scheduler))
         listener_task = asyncio.create_task(matrix.listen_forever())
         print("Matrix listener active.")
     else:

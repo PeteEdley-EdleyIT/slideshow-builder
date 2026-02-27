@@ -96,60 +96,8 @@ class Config:
     """
     def __init__(self):
         """
-        Initializes the Config object by loading all relevant environment variables.
+        Initializes the Config object. Metadata for UI and groups is static.
         """
-        # Slideshow Settings
-        self.image_duration = get_env_int("IMAGE_DURATION", 10)
-        self.target_video_duration = get_env_int("TARGET_VIDEO_DURATION", 600)
-        
-        # Hardcoded container paths for local files
-        self.image_folder = "/app/images"
-        self.output_folder = "/app/output"
-        # Default to container path, but allow override (e.g. for Nextcloud path)
-        self.music_folder = get_env_var("MUSIC_FOLDER", "/app/music")
-        self.output_filepath = "/app/output/slideshow.mp4"
-        
-        # Nextcloud Configuration
-        self.nc_url = get_env_var("NEXTCLOUD_URL")
-        self.nc_user = get_env_var("NEXTCLOUD_USERNAME")
-        self.nc_pass = get_env_var("NEXTCLOUD_PASSWORD")
-        self.nc_image_path = get_env_var("NEXTCLOUD_IMAGE_PATH") # Deprecated, use nextcloud_image_path
-        self.nextcloud_image_path = self.nc_image_path
-        self.nc_upload_path = get_env_var("NEXTCLOUD_UPLOAD_PATH") # Deprecated, use upload_nextcloud_path
-        self.upload_nextcloud_path = self.nc_upload_path
-        self.nc_insecure = get_env_bool("NEXTCLOUD_INSECURE_SSL", False)
-        
-        # Source Selection (auto-detect based on Nextcloud config, or use explicit setting)
-        # If NEXTCLOUD_IMAGE_PATH is set, default to nextcloud, otherwise local
-        self.image_source = get_env_var("IMAGE_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
-        self.music_source = get_env_var("MUSIC_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
-        
-        # Append Video Configuration
-        self.append_video_path = get_env_var("APPEND_VIDEO_PATH")
-        self.append_video_source = get_env_var("APPEND_VIDEO_SOURCE", "nextcloud" if self.append_video_path and self.nc_url else "local")
-        
-        # Matrix Bot Configuration
-        self.matrix_homeserver = get_env_var("MATRIX_HOMESERVER")
-        self.matrix_token = get_env_var("MATRIX_ACCESS_TOKEN")
-        self.matrix_room = get_env_var("MATRIX_ROOM_ID")
-        self.matrix_user_id = get_env_var("MATRIX_USER_ID")
-        
-        # ntfy Notification Configuration
-        self.ntfy_url = get_env_var("NTFY_URL")
-        self.ntfy_topic = get_env_var("NTFY_TOPIC")
-        self.ntfy_token = get_env_var("NTFY_TOKEN")
-        self.enable_heartbeat_ntfy = get_env_bool("ENABLE_HEARTBEAT_NTFY", True) # Specifically for health alerts
-        self.enable_ntfy = get_env_bool("ENABLE_NTFY", True)
-        
-        # Scheduling & Health
-        self.cron_schedule = get_env_var("CRON_SCHEDULE", "0 1 * * 5")
-        self.enable_heartbeat = get_env_bool("ENABLE_HEARTBEAT", True)
-        
-        # Timer Overlay Configuration
-        self.enable_timer = get_env_bool("ENABLE_TIMER", False)
-        self.timer_minutes = get_env_int("TIMER_MINUTES", 5)
-        self.timer_position = get_env_var("TIMER_POSITION", "auto")
-
         # --- Metadata for Bot UI ---
         # Logical grouping of settings for !help and !get all
         self.CONFIG_GROUPS = {
@@ -175,3 +123,124 @@ class Config:
         self.CONFIGURABLE_SETTINGS = []
         for keys in self.CONFIG_GROUPS.values():
             self.CONFIGURABLE_SETTINGS.extend([k for k in keys if k is not None])
+
+        # Hardcoded container paths - these do not change at runtime
+        self.image_folder = "/app/images"
+        self.output_folder = "/app/output"
+        self.output_filepath = "/app/output/slideshow.mp4"
+
+    @property
+    def images_folder(self):
+        """Alias for image_folder used by VideoEngine."""
+        return self.image_folder
+
+    # --- Dynamic Properties ---
+    # These call get_env_var/int/bool every time, ensuring hot-reloading from DB
+
+    @property
+    def image_duration(self):
+        return get_env_int("IMAGE_DURATION", 10)
+
+    @property
+    def target_video_duration(self):
+        return get_env_int("TARGET_VIDEO_DURATION", 600)
+
+    @property
+    def music_folder(self):
+        return get_env_var("MUSIC_FOLDER", "/app/music")
+
+    @property
+    def nc_url(self):
+        return get_env_var("NEXTCLOUD_URL")
+
+    @property
+    def nc_user(self):
+        return get_env_var("NEXTCLOUD_USERNAME")
+
+    @property
+    def nc_pass(self):
+        return get_env_var("NEXTCLOUD_PASSWORD")
+
+    @property
+    def nextcloud_image_path(self):
+        return get_env_var("NEXTCLOUD_IMAGE_PATH")
+
+    @property
+    def upload_nextcloud_path(self):
+        return get_env_var("NEXTCLOUD_UPLOAD_PATH")
+
+    @property
+    def nc_insecure(self):
+        return get_env_bool("NEXTCLOUD_INSECURE_SSL", False)
+
+    @property
+    def image_source(self):
+        return get_env_var("IMAGE_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
+
+    @property
+    def music_source(self):
+        return get_env_var("MUSIC_SOURCE", "nextcloud" if self.nextcloud_image_path else "local")
+
+    @property
+    def append_video_path(self):
+        return get_env_var("APPEND_VIDEO_PATH")
+
+    @property
+    def append_video_source(self):
+        return get_env_var("APPEND_VIDEO_SOURCE", "nextcloud" if self.append_video_path and self.nc_url else "local")
+
+    @property
+    def matrix_homeserver(self):
+        return get_env_var("MATRIX_HOMESERVER")
+
+    @property
+    def matrix_token(self):
+        return get_env_var("MATRIX_ACCESS_TOKEN")
+
+    @property
+    def matrix_room(self):
+        return get_env_var("MATRIX_ROOM_ID")
+
+    @property
+    def matrix_user_id(self):
+        return get_env_var("MATRIX_USER_ID")
+
+    @property
+    def ntfy_url(self):
+        return get_env_var("NTFY_URL")
+
+    @property
+    def ntfy_topic(self):
+        return get_env_var("NTFY_TOPIC")
+
+    @property
+    def ntfy_token(self):
+        return get_env_var("NTFY_TOKEN")
+
+    @property
+    def enable_heartbeat_ntfy(self):
+        return get_env_bool("ENABLE_HEARTBEAT_NTFY", True)
+
+    @property
+    def enable_ntfy(self):
+        return get_env_bool("ENABLE_NTFY", True)
+
+    @property
+    def cron_schedule(self):
+        return get_env_var("CRON_SCHEDULE", "0 1 * * 5")
+
+    @property
+    def enable_heartbeat(self):
+        return get_env_bool("ENABLE_HEARTBEAT", True)
+
+    @property
+    def enable_timer(self):
+        return get_env_bool("ENABLE_TIMER", False)
+
+    @property
+    def timer_minutes(self):
+        return get_env_int("TIMER_MINUTES", 5)
+
+    @property
+    def timer_position(self):
+        return get_env_var("TIMER_POSITION", "auto")
