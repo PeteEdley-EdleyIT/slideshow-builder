@@ -10,7 +10,7 @@ import os
 from peewee import SqliteDatabase, Model, CharField, TextField, DoesNotExist
 
 # Database configuration - hardcoded to /data for container use
-DB_DIR = "/data"
+DB_DIR = os.environ.get("DB_DIR", "/data")
 DB_PATH = os.path.join(DB_DIR, "settings.db")
 
 # Initialize database

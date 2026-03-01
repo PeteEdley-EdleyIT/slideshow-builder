@@ -71,8 +71,8 @@ class AudioManager:
         # Link metadata to tracks
         track_metadata = {}
         for mp3 in mp3_files:
-            base = os.path.splitext(mp3)[0]
-            md_match = next((md for md in md_files if os.path.splitext(md)[0] == base), None)
+            base_mp3 = os.path.splitext(os.path.basename(mp3))[0].lower()
+            md_match = next((md for md in md_files if os.path.splitext(os.path.basename(md))[0].lower() == base_mp3), None)
             if md_match:
                 try:
                     with open(md_match, 'r', encoding='utf-8') as f:

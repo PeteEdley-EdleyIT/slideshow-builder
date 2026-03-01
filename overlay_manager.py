@@ -90,6 +90,8 @@ class MusicAttributionOverlay:
         
         # Max width is 1/3 of the screen
         max_w = self.target_size[0] // 3
+        # Restore max_h from older code just in case
+        max_h = self.target_size[1] // 5
         
         # Create the text clip
         txt_clip = TextClip(
@@ -104,7 +106,7 @@ class MusicAttributionOverlay:
         
         # Get actual text dimensions
         txt_w, txt_h = txt_clip.size
-        box_w, box_h = int((txt_w + 40) * 1.2), txt_h + 30
+        box_w, box_h = txt_w + 40, txt_h + 30
         
         # Add a semi-transparent box for readability
         bg_clip = ColorClip(size=(box_w, box_h), color=(0, 0, 0), ismask=False).set_opacity(0.6).set_duration(duration)
@@ -127,3 +129,4 @@ class MusicAttributionOverlay:
         # Composite them
         attr_layered = CompositeVideoClip([bg_clip, txt_clip.set_position("center")], size=(box_w, box_h))
         return attr_layered.set_position(pos)
+
