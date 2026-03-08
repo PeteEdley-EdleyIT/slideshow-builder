@@ -98,7 +98,7 @@ async def run_automation(matrix=None):
 
         health_mgr.update_status("Starting", "Checking output paths")
         output_path = config.output_filepath
-        if not output_path and config.upload_nextcloud_path:
+        if not output_path and config.nextcloud_upload_path:
             fd, output_path = tempfile.mkstemp(suffix=".mp4")
             os.close(fd)
             temp_output_file = output_path
@@ -128,7 +128,7 @@ async def run_automation(matrix=None):
         health_mgr.mark_success()
         
         if matrix.is_configured():
-            video_name = config.upload_nextcloud_path or os.path.basename(output_path)
+            video_name = config.nextcloud_upload_path or os.path.basename(output_path)
             # send_success already includes the slide list, so it's a good final summary
             await matrix.send_success(video_name, included_slides)
             

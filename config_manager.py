@@ -166,7 +166,7 @@ class Config:
         return get_env_var("NEXTCLOUD_IMAGE_PATH")
 
     @property
-    def upload_nextcloud_path(self):
+    def nextcloud_upload_path(self):
         return get_env_var("NEXTCLOUD_UPLOAD_PATH")
 
     @property

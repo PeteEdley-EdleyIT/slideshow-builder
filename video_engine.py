@@ -93,12 +93,12 @@ class VideoEngine:
                     raise ValueError(f"Local append video file does not exist: {self.config.append_video_path}")
 
         # 4. Check Nextcloud Upload Destination (Parent Directory)
-        if self.config.upload_nextcloud_path:
+        if self.config.nextcloud_upload_path:
             if not self.nc_client:
                 raise ValueError("Nextcloud client not initialized but Nextcloud upload path configured.")
             
             # Check the parent directory of the upload path
-            parent_dir = os.path.dirname(self.config.upload_nextcloud_path)
+            parent_dir = os.path.dirname(self.config.nextcloud_upload_path)
             if parent_dir and not await asyncio.to_thread(self.nc_client.check_path_exists, parent_dir):
                 raise ValueError(f"Nextcloud upload destination directory does not exist: {parent_dir}")
         
@@ -204,12 +204,12 @@ class VideoEngine:
                 filename = os.path.basename(output_filepath)
                 await status_callback(f"💾 Video file successfully written to local storage: `{filename}`", "written")
             
-            if self.nc_client and self.config.upload_nextcloud_path:
+            if self.nc_client and self.config.nextcloud_upload_path:
                 if self.health_mgr:
-                    self.health_mgr.update_status("Uploading", f"Uploading to {self.config.upload_nextcloud_path}")
-                await asyncio.to_thread(self.nc_client.upload_file, output_filepath, self.config.upload_nextcloud_path)
+                    self.health_mgr.update_status("Uploading", f"Uploading to {self.config.nextcloud_upload_path}")
+                await asyncio.to_thread(self.nc_client.upload_file, output_filepath, self.config.nextcloud_upload_path)
                 if status_callback:
-                    await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.upload_nextcloud_path}`", "uploaded")
+                    await status_callback(f"☁️ Video successfully uploaded to Nextcloud: `{self.config.nextcloud_upload_path}`", "uploaded")
                 
             return included_slides
 
