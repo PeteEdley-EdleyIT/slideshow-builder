@@ -38,7 +38,7 @@ class SlideshowGenerator:
         """
         self.target_size = target_size
 
-    def create_video(self, image_paths, image_duration, target_duration, fps):
+    def create_video(self, image_paths, image_duration, target_duration, fps, transition_enabled=False, transition_duration=1):
         """
         Creates a repeating slideshow video from a list of image paths.
 
@@ -54,6 +54,8 @@ class SlideshowGenerator:
             target_duration (int): The desired total duration (in seconds) of the
                                    final slideshow video.
             fps (int): The frames per second for the output video.
+            transition_enabled (bool): Whether to apply crossfade transitions.
+            transition_duration (int): Duration of the crossfade in seconds.
 
         Returns:
             VideoClip: A MoviePy VideoClip object representing the generated
@@ -78,12 +80,24 @@ class SlideshowGenerator:
             return None
 
         # Calculate how many times the image sequence needs to be repeated
-        sequence_duration = len(clips) * image_duration
-        num_repeats = math.ceil(target_duration / sequence_duration) if sequence_duration > 0 else 1
+        overlap = transition_duration if transition_enabled else 0
+        sequence_duration = len(clips) * image_duration - (len(clips) - 1) * overlap
+        
+        num_repeats = math.ceil((target_duration + overlap) / sequence_duration) if sequence_duration > 0 else 1
         repeated_clips = clips * int(num_repeats)
 
+        if transition_enabled and len(repeated_clips) > 1:
+            processed_clips = [repeated_clips[0]]
+            for clip in repeated_clips[1:]:
+                processed_clips.append(clip.crossfadein(transition_duration))
+            repeated_clips = processed_clips
+
         # Concatenate clips and set final duration and FPS
-        slideshow_video = concatenate_videoclips(repeated_clips, method="chain")
+        if transition_enabled:
+            slideshow_video = concatenate_videoclips(repeated_clips, method="compose", padding=-transition_duration)
+        else:
+            slideshow_video = concatenate_videoclips(repeated_clips, method="chain")
+
         slideshow_video = slideshow_video.subclip(0, target_duration).set_duration(target_duration)
         slideshow_video.fps = fps
         

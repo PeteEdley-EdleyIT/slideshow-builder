@@ -101,7 +101,7 @@ class Config:
         # --- Metadata for Bot UI ---
         # Logical grouping of settings for !help and !get all
         self.CONFIG_GROUPS = {
-            "⚙️ **General**": ["IMAGE_DURATION", "TARGET_VIDEO_DURATION", "CRON_SCHEDULE"],
+            "⚙️ **General**": ["IMAGE_DURATION", "TARGET_VIDEO_DURATION", "CRON_SCHEDULE", "TRANSITION_ENABLED", "TRANSITION_DURATION"],
             "☁️ **Nextcloud**": [
                 "NEXTCLOUD_UPLOAD_PATH", 
                 None,
@@ -244,3 +244,11 @@ class Config:
     @property
     def timer_position(self):
         return get_env_var("TIMER_POSITION", "auto")
+
+    @property
+    def transition_enabled(self):
+        return get_env_bool("TRANSITION_ENABLED", False)
+
+    @property
+    def transition_duration(self):
+        return get_env_int("TRANSITION_DURATION", 1)

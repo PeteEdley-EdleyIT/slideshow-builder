@@ -119,7 +119,7 @@ class VideoEngine:
         """
         temp_dirs = []
         append_video_clip = None
-        fps = 5 # Default starting FPS
+        fps = 30 if self.config.transition_enabled else 5 # Default starting FPS
         music_attributions = []
 
         try:
@@ -155,7 +155,9 @@ class VideoEngine:
                     self.health_mgr.update_status("Generating", "Creating slideshow video")
                 slideshow_video = await asyncio.to_thread(
                     self.generator.create_video, 
-                    image_paths, self.config.image_duration, slideshow_target_duration, fps
+                    image_paths, self.config.image_duration, slideshow_target_duration, fps,
+                    transition_enabled=self.config.transition_enabled,
+                    transition_duration=self.config.transition_duration
                 )
                 
                 if self.health_mgr:
@@ -258,7 +260,10 @@ class VideoEngine:
         """Internal helper to concatenate clips into the final video."""
         if append:
             if slideshow:
-                final = concatenate_videoclips([slideshow, append], method="chain")
+                if self.config.transition_enabled:
+                    final = concatenate_videoclips([slideshow, append], method="compose")
+                else:
+                    final = concatenate_videoclips([slideshow, append], method="chain")
             else:
                 final = append
         else:
